@@ -1,0 +1,9 @@
+{
+	"ServerSeed": "6cc7b78f114e78199e1c5022b7a733ccc231786516f654f4fad30baeda96e67a",
+	"ClientSeed": "GJH5YXXrv7",
+	"MinimumNonce": 1,
+	"MaximumNonce": 10000,
+	"Risk": "Medium",
+	"Segments": 20,
+	"BetSize": 2.23
+}

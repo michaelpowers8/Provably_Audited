@@ -1,0 +1,8 @@
+{
+	"ServerSeed": "fa18081cb423696caad04b12efc0154ecc746857c2105f7d82d042d7df1c70d5",
+	"ClientSeed": "k2lOa3xGLY",
+	"MinimumNonce": 1,
+	"MaximumNonce": 1000000,
+	"TargetMultiplier": 100000,
+	"BetSize": 1000
+}
