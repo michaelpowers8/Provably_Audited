@@ -150,6 +150,7 @@ Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
+Bet Size: {bet_size:,.2f}
 Difficulty: {difficulty}
 Number of Pumps Attempted per Game: {num_pumps}
 Winning Multiplier: {pump_multipliers[difficulty][num_pumps]:,.2f}
