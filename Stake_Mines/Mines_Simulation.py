@@ -116,8 +116,8 @@ def generate_client_seed():
 def seed_result_to_string(results:list[list[str]]) -> str:
     final_string:str = ""
     for row in results[:-1]:
-        final_string += f"{'|'.join(row)}\n"
-    final_string += f"{'|'.join(results[-1])}"
+        final_string += f"\t\t\t{'|'.join(row)}\n"
+    final_string += f"\t\t\t{'|'.join(results[-1])}"
     return final_string
 
 if __name__ == "__main__":
@@ -164,8 +164,23 @@ if __name__ == "__main__":
             total_number_of_wins += 1
         current_result.extend([current_winnings,seed_result_to_string(seed_result),seed_result_to_string(clicks_results)])
         results.append(current_result.copy())
+    with open(f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w",encoding='utf-8') as file:
+        file.write("[\n")
+        file.write("Server Seed, Client Seed, Nonce, Amount Won, Mine Configuration, Clicks Results\n")
+        for result in results:
+            file.write("\t{\n")
+            file.write(f"""     Server Seed: {result[0]},
+        Client Seed: {result[1]},
+        Nonce: {result[2]},
+        Amount Won: {result[3]},
+        Mine Configuration: 
+{result[4]}
+        Clicks Results:
+{result[5]}""")
+            file.write("\n\t},\n")
+        file.write("]")
             
-    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Amount Won","Mine Configuration","Clicks Results"]).to_excel(f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.xlsx",index=False)
+    # DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Amount Won","Mine Configuration","Clicks Results"]).to_excel(f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.xlsx",index=False)
     with open(f"MINES_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
         file.write(f"""MINES {num_mines} MINES ANALYSIS
 Server Seed: {server}
