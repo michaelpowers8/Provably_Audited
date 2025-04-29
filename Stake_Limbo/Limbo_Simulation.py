@@ -53,7 +53,7 @@ def bytes_to_number(bytes_list: list[int],multiplier:int) -> int:
     number = number*multiplier
     return floor(number)
 
-def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> float:
+def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> str:
     hexs = seeds_to_hexadecimals(server_seed=server_seed,client_seed=client_seed,nonce=nonce)
     bytes_lists:list[list[int]] = [hexadecimal_to_bytes(current_hex) for current_hex in hexs]
     row:list[list[int]] = []
@@ -61,7 +61,7 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> float:
         for index in range(0,len(bytes_list),4):
             row.append(bytes_to_number(bytes_list[index:index+4],16777216))
             if(len(row)==1):
-                return round(((16777216)/(row[0]+1))*(1-0.01),2)
+                return floor(((16777216)/(row[0]+1)*(1-0.01))*100)/100
 
 if __name__ == "__main__":
     with open("Configuration.json","rb") as file:
