@@ -107,10 +107,12 @@ if __name__ == "__main__":
     biggest_winning_streak:tuple[int,int] = (0,0)
     biggest_losing_streak:tuple[int,int] = (0,0)
 
-    minimum_losing_streak_to_start_bets:int = 300
+    minimum_losing_streak_to_start_bets:int = 100
     interval_losing_streak:int = 48
     initial_bet_size:float = 0.2
     increment_bet_increase:float = 4
+    balance:float = 38108.67
+    starting_balance:float = balance
 
     current_winning_streak:int = 0
     current_losing_streak:int = 0
@@ -143,6 +145,9 @@ if __name__ == "__main__":
             current_losing_streak += 1
             total_number_of_losses += 1
             money_bet += bet_size
+            balance -= bet_size
+            if(balance < 0):
+                break
             current_result.extend([seed_result,"NO",f"{bet_size:,.2f}"])
             if(current_losing_streak==minimum_losing_streak_to_start_bets):
                 bet_size = initial_bet_size
@@ -157,6 +162,10 @@ if __name__ == "__main__":
             current_winning_streak += 1
             total_number_of_wins += 1
             money_bet += bet_size
+            balance -= bet_size
+            if(balance < 0):
+                break
+            balance += (bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")])
             money_won += (bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")])
             current_result.extend([seed_result,"YES",f"{bet_size:,.2f}"])
             bet_size = 0
@@ -180,6 +189,8 @@ Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
+Initial Balance: ${starting_balance:,.2f}
+Ending Balance: ${balance if balance>0 else 0:,.2f}
 Bet Size: ${bet_size:,.2f}
 Winning Multiplier: {dice_multipliers[over_under][float(f"{threshold:.2f}")]:,.4f}
 Net Profit per Win: ${bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")] - bet_size:,.2f}
@@ -188,9 +199,9 @@ Number of wins: {total_number_of_wins:,.0f}
 Number of Losses: {total_number_of_losses:,.0f}
 Mean Losing Streak: {mean(losing_streak_sizes):,.3f}
 Median Losing Streak: {median(losing_streak_sizes):,.1f}
-Five Number Summary of Losing Streaks:
-    Min |   25%   | 50%   | 75%   | Max
-    {min(losing_streak_sizes)}  |    {quantile(losing_streak_sizes,0.25)}  |   {median(losing_streak_sizes)}   |   {quantile(losing_streak_sizes,0.75)} |   {max(losing_streak_sizes)}
+Statistical Summary of Losing Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(losing_streak_sizes):,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.25):,.0f}\t\t|\t\t{median(losing_streak_sizes):,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.75):,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.95):,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.99):,.0f}\t\t|\t\t{max(losing_streak_sizes):,.0f}
 Biggest Winning Streak: {biggest_winning_streak[1]:,.0f}
 Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
 Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
