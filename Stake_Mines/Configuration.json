@@ -1,0 +1,15 @@
+{
+	"ServerSeed": "fa18081cb423696caad04b12efc0151ecc746857c2105f7d82d042d7df1c70d5",
+	"ClientSeed": "5431u2890y5240398th2n5340f9h8r4n3089f",
+	"MinimumNonce": 1,
+	"MaximumNonce": 1000,
+	"NumberOfMines": 8,
+	"BoxesToClick": [
+                        [0,0,1,0,0],
+                        [0,0,1,0,0],
+                        [1,1,1,1,1],
+                        [0,0,1,0,0],
+                        [0,0,1,0,0]
+                    ],
+    "BetSize": 8.63
+}
