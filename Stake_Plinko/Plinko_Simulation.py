@@ -74,6 +74,8 @@ if __name__ == "__main__":
     nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
     risk:str = configuration["Risk"]
     num_rows:int = configuration["Rows"]
+    bet_size:float = configuration["BetSize"]
+
     results:list[list[float|int]] = []
     current_result:list[int] = []
 
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         total_games_played += 1
         current_result = [server,client,nonce]
         seed_result = seeds_to_results(server_seed=server,client_seed=client,nonce=nonce,risk=risk,rows=num_rows)
-        money_won += seed_result[1]
+        money_won += (bet_size*seed_result[1])
         if(seed_result[1] < 1):
             if(current_winning_streak > biggest_winning_streak[1]):
                 biggest_winning_streak = (nonce-current_winning_streak,current_winning_streak)
@@ -114,7 +116,7 @@ if __name__ == "__main__":
             nonces_with_third_largest_prize.append(f"{nonce:,.0f}")
         current_result.extend(seed_result)
         results.append(current_result)
-    # DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Prize Index","Multiplier"]).to_csv(f"PLINKO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Prize Index","Multiplier"]).to_csv(f"PLINKO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
     with open(f"PLINKO_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
         file.write(f"""PLINKO BALL {risk.upper()} RISK {num_rows} ROWS ANALYSIS
 Server Seed: {server}
@@ -122,14 +124,14 @@ Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
 Number of games simulated: {total_games_played:,.0f}
-Number of wins: {total_number_of_wins:,.0f}
+Number of Wins: {total_number_of_wins:,.0f}
 Number of Losses: {total_number_of_losses:,.0f}
 Biggest Winning Streak: {biggest_winning_streak[1]:,.0f}
 Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
 Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
 Starting Nonce of Biggest Losing Streak: {biggest_losing_streak[0]:,.0f}
-Assuming $1 bets, gross winnings: ${money_won:,.2f}
-Assuming $1 bets, net result: ${abs(money_won-total_games_played):,.2f} {"won" if money_won-total_games_played>0 else "lost"}.
+With ${bet_size:,.2f} bets, gross winnings: ${money_won:,.2f}
+With ${bet_size:,.2f} bets, net result: ${abs(money_won-(bet_size*total_games_played)):,.2f} {"won" if money_won-(bet_size*total_games_played)>0 else "lost"}.
 Number of {plinko_multipliers[f"{risk}{num_rows}"][0]}x multipliers: {len(nonces_with_largest_prize):,.0f}
 Nonces with {plinko_multipliers[f"{risk}{num_rows}"][0]}x multipliers: {"|".join(nonces_with_largest_prize)}
 Number of {plinko_multipliers[f"{risk}{num_rows}"][1]}x multipliers: {len(nonces_with_second_largest_prize):,.0f}
