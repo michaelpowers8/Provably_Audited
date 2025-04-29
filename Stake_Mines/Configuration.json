@@ -2,8 +2,8 @@
 	"ServerSeed": "fa18081cb423696caad04b12efc0151ecc746857c2105f7d82d042d7df1c70d5",
 	"ClientSeed": "5431u2890y5240398th2n5340f9h8r4n3089f",
 	"MinimumNonce": 1,
-	"MaximumNonce": 1000000,
-	"NumberOfMines": 12,
+	"MaximumNonce": 100,
+	"NumberOfMines": 4,
 	"BoxesToClick": [
                         [0,0,1,0,0],
                         [0,0,1,0,0],
