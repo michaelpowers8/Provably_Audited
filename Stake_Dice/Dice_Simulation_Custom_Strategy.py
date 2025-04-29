@@ -3,7 +3,7 @@ import hashlib
 import random
 import string
 from math import floor
-from numpy import mean,median
+from numpy import mean,median,quantile
 import json
 from pandas import DataFrame
 from Mulitpliers import dice_multipliers
@@ -186,8 +186,11 @@ Net Profit per Win: ${bet_size*dice_multipliers[over_under][float(f"{threshold:.
 Number of games simulated: {total_games_played:,.0f}
 Number of wins: {total_number_of_wins:,.0f}
 Number of Losses: {total_number_of_losses:,.0f}
-Mean Losing Streak: {mean(losing_streak_sizes):,.0f}
-Median Losing Streak: {median(losing_streak_sizes):,.0f}
+Mean Losing Streak: {mean(losing_streak_sizes):,.3f}
+Median Losing Streak: {median(losing_streak_sizes):,.1f}
+Five Number Summary of Losing Streaks:
+    Min |   25%   | 50%   | 75%   | Max
+    {min(losing_streak_sizes)}  |    {quantile(losing_streak_sizes,0.25)}  |   {median(losing_streak_sizes)}   |   {quantile(losing_streak_sizes,0.75)} |   {max(losing_streak_sizes)}
 Biggest Winning Streak: {biggest_winning_streak[1]:,.0f}
 Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
 Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
