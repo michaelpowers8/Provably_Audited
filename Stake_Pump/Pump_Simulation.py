@@ -5,6 +5,7 @@ import string
 from math import floor
 import json
 from Multipliers import pump_multipliers
+from pandas import DataFrame
 
 def sha256_encrypt(input_string: str) -> str:
     # Create a sha256 hash object
@@ -64,13 +65,13 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int,difficulty:str) -
         shuffle.remove(shuffle[number])
     final_shuffle.append(shuffle[0])
     if(difficulty=="Easy"):
-        return min(final_shuffle[:1])
+        return min(final_shuffle[:1])-1
     if(difficulty=="Medium"):
-        return min(final_shuffle[:3])
+        return min(final_shuffle[:3])-1
     if(difficulty=="Hard"):
-        return min(final_shuffle[:5])
+        return min(final_shuffle[:5])-1
     if(difficulty=="Expert"):
-        return min(final_shuffle[:10])
+        return min(final_shuffle[:10])-1
 
 def calculate_winnings(bet:float,num_pumps:int,result:int,difficulty:str):
     if(num_pumps>pump_multipliers[difficulty].index(pump_multipliers[difficulty][result-1])):
@@ -142,8 +143,10 @@ if __name__ == "__main__":
             nonces_with_second_biggest_multiplier.append(f"{nonce:,.0f}")
         elif(seed_result == (len(pump_multipliers[difficulty])-2)):
             nonces_with_third_largest_multiplier.append(f"{nonce:,.0f}")
-        current_result.extend([seed_result])
+        current_result.extend([f"{pump_multipliers[difficulty][seed_result]:,.2f}",f"${current_winnings:,.2f}"])
         results.append(current_result)
+
+    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Max Result","Amount Won"]).to_csv(f"PUMP_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
     with open(f"PUMP_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
         file.write(f"""PUMP {difficulty} DIFFICULTY {num_pumps} PUMPS ANALYSIS
 Server Seed: {server}
