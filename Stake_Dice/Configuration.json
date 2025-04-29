@@ -1,10 +1,10 @@
 {
-	"ServerSeed": "4d78642c702edb5e53ff680e8850a60ef77f7e5185bdd54bed8228586407d518",
-	"ClientSeed": "2tb5k4jlhbg6hkj2bh45",
-	"MinimumNonce": 1321,
-	"MaximumNonce": 3289,
-	"OverUnder": "Under",
-	"Threshold": 5,
-	"WinChance": 92.78,
-	"BetSize": 1000
+	"ServerSeed": "4d78642c704edb5e53ff680e8850a60ef77f7e5185bdd54bed8228586407d518",
+	"ClientSeed": "2tb5k4_lhbg6hkj2bh45",
+	"MinimumNonce": 1,
+	"MaximumNonce": 1000000,
+	"OverUnder": "Over",
+	"Threshold": 98,
+	"WinChance": 2,
+	"BetSize": 1
 }
