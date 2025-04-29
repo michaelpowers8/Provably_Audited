@@ -2,8 +2,8 @@
 	"ServerSeed": "fa18081cb423696caad04b12efc0154ecc746857c2105f7d82d042d7df1c70d5",
 	"ClientSeed": "k2lOa3xGLY",
 	"MinimumNonce": 1,
-	"MaximumNonce": 10000000,
+	"MaximumNonce": 100,
 	"Difficulty": "Expert",
-	"NumberOfPumps": 60,
+	"NumberOfPumps": 3,
 	"BetSize": 3.55
 }
