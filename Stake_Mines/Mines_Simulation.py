@@ -166,7 +166,6 @@ if __name__ == "__main__":
         results.append(current_result.copy())
     with open(f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w",encoding='utf-8') as file:
         file.write("[\n")
-        file.write("Server Seed, Client Seed, Nonce, Amount Won, Mine Configuration, Clicks Results\n")
         for result in results:
             file.write("\t{\n")
             file.write(f"""     Server Seed: {result[0]},
