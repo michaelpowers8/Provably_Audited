@@ -108,10 +108,10 @@ if __name__ == "__main__":
     biggest_losing_streak:tuple[int,int] = (0,0)
 
     minimum_losing_streak_to_start_bets:int = 35
-    interval_losing_streak:int = 48
+    interval_losing_streak:int = 37
     initial_bet_size:float = 0.2
     increment_bet_increase:float = 3
-    balance:float = 38108.67
+    balance:float = 1_000_000_000
     biggest_balance:float = balance
     starting_balance:float = balance
 
@@ -124,12 +124,34 @@ if __name__ == "__main__":
     money_won:float = 0
     money_bet:float = 0
     nonces_with_perfect_rolls:list[int] = []
+    money_spent_over_current_losing_streak:float = 0
+    most_money_spent_over_current_losing_streak:float = 0
 
-    for _ in range(10000):
+    for _ in range(100000):
         server:str = generate_server_seed()#configuration["ServerSeed"]
         server_hashed:str = sha256_encrypt(server)
         client:str = generate_client_seed()#configuration["ClientSeed"]
-        balance:float = 38108.67
+        print(f"{server}\n{client}\n")
+        balance:float = starting_balance
+        biggest_balance:float = balance
+        nonces:int = list(range(1,1000001))
+        current_losing_streak:int = 0
+        bet_size:float = 0
+        largest_bet_size:float = 0
+        current_winning_streak:int = 0
+        current_losing_streak:int = 0
+        losing_streak_sizes:list[int] = []
+        total_number_of_wins:int = 0
+        total_number_of_losses:int = 0
+        total_games_played:int = 0
+        money_won:float = 0
+        money_bet:float = 0
+        most_money_spent_over_current_losing_streak:float = 0
+        money_spent_over_current_losing_streak:float = 0
+        nonces_with_perfect_rolls:list[int] = []
+        biggest_winning_streak:tuple[int,int] = (0,0)
+        biggest_losing_streak:tuple[int,int] = (0,0)
+
         for nonce in nonces:
             total_games_played += 1
             current_result = [server,client,nonce]
@@ -151,19 +173,24 @@ if __name__ == "__main__":
                 current_losing_streak += 1
                 total_number_of_losses += 1
                 money_bet += bet_size
+                money_spent_over_current_losing_streak += bet_size
                 balance -= bet_size
                 if(balance < 0):
                     break
                 current_result.extend([seed_result,"NO",f"{bet_size:,.2f}"])
                 if(current_losing_streak==minimum_losing_streak_to_start_bets):
                     bet_size = initial_bet_size
-                elif(current_losing_streak in [minimum_losing_streak_to_start_bets+(interval_losing_streak*increment) for increment in range(10)]):
+                elif(current_losing_streak in [minimum_losing_streak_to_start_bets+(interval_losing_streak*increment) for increment in range(100)]):
                     bet_size *= 3
+                    if(bet_size > largest_bet_size):
+                        largest_bet_size = bet_size
             else:
                 if(current_losing_streak > biggest_losing_streak[1]):
                     biggest_losing_streak = (nonce-current_losing_streak,current_losing_streak)
                 if(current_losing_streak>0):
                     losing_streak_sizes.append(current_losing_streak)
+                if(money_spent_over_current_losing_streak > most_money_spent_over_current_losing_streak):
+                    most_money_spent_over_current_losing_streak = money_spent_over_current_losing_streak
                 current_losing_streak = 0
                 current_winning_streak += 1
                 total_number_of_wins += 1
@@ -177,6 +204,7 @@ if __name__ == "__main__":
                 money_won += (bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")])
                 current_result.extend([seed_result,"YES",f"{bet_size:,.2f}"])
                 bet_size = 0
+                money_spent_over_current_losing_streak = 0
             if(
                 (
                     (seed_result > 99.99)and
@@ -189,7 +217,7 @@ if __name__ == "__main__":
                 )
             ):
                 nonces_with_perfect_rolls.append(f"{nonce:,.0f}")
-            results.append(current_result)
+            #results.append(current_result)
         # DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Win","Bet Size"]).to_csv(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
         #f"DICE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt"
         with open("DICE_RESULTS_ANALYSIS.txt","a") as file:
@@ -202,6 +230,8 @@ Initial Balance: ${starting_balance:,.2f}
 Ending Balance: ${balance if balance>0 else 0:,.2f}
 Largest Balance Ever: ${biggest_balance:,.2f}
 Bet Size: ${bet_size:,.2f}
+Largest Bet Made: ${largest_bet_size:,.2f}
+Most Money Spent Over Losing Streak: ${most_money_spent_over_current_losing_streak:,.2f}
 Winning Multiplier: {dice_multipliers[over_under][float(f"{threshold:.2f}")]:,.4f}
 Net Profit per Win: ${bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")] - bet_size:,.2f}
 Number of games simulated: {total_games_played:,.0f}
