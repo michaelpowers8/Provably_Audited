@@ -4,7 +4,7 @@
 	"MinimumNonce": 1,
 	"MaximumNonce": 10000000,
 	"OverUnder": "Over",
-	"Threshold": 98,
-	"WinChance": 2,
+	"Threshold": 50,
+	"WinChance": 50,
 	"BetSize": 1
 }
