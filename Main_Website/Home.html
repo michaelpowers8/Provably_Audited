@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provably Audited - Fair Gambling Simulations & Analysis</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        :root {
+            --primary: #4a6bff;
+            --secondary: #6c757d;
+            --dark: #343a40;
+            --light: #f8f9fa;
+            --success: #28a745;
+            --danger: #dc3545;
+            --border-radius: 8px;
+            --box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7ff;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        header {
+            background-color: white;
+            box-shadow: var(--box-shadow);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+        
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        
+        .logo i {
+            margin-right: 10px;
+            color: var(--primary);
+        }
+        
+        .nav-links {
+            display: flex;
+            list-style: none;
+        }
+        
+        .nav-links li {
+            margin-left: 30px;
+        }
+        
+        .nav-links a {
+            text-decoration: none;
+            color: var(--dark);
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: var(--primary);
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background-color: #3a5bef;
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(74, 107, 255, 0.3);
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .hero {
+            padding: 80px 0;
+            text-align: center;
+        }
+        
+        .hero h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: var(--dark);
+        }
+        
+        .hero p {
+            font-size: 20px;
+            color: var(--secondary);
+            max-width: 700px;
+            margin: 0 auto 40px;
+        }
+        
+        .features {
+            padding: 60px 0;
+            background-color: white;
+        }
+        
+        .section-title {
+            text-align: center;
+            margin-bottom: 50px;
+        }
+        
+        .section-title h2 {
+            font-size: 36px;
+            color: var(--dark);
+        }
+        
+        .section-title p {
+            color: var(--secondary);
+            max-width: 600px;
+            margin: 15px auto 0;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+        }
+        
+        .feature-card {
+            background-color: var(--light);
+            padding: 30px;
+            border-radius: var(--border-radius);
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: var(--box-shadow);
+        }
+        
+        .feature-icon {
+            font-size: 40px;
+            color: var(--primary);
+            margin-bottom: 20px;
+        }
+        
+        .feature-card h3 {
+            margin-bottom: 15px;
+            font-size: 22px;
+        }
+        
+        .feature-card p {
+            color: var(--secondary);
+        }
+        
+        .how-it-works {
+            padding: 80px 0;
+        }
+        
+        .steps {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            margin-top: 50px;
+        }
+        
+        .step {
+            flex: 1;
+            min-width: 250px;
+            text-align: center;
+            padding: 0 20px;
+            position: relative;
+            margin-bottom: 40px;
+        }
+        
+        .step-number {
+            width: 60px;
+            height: 60px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 auto 20px;
+        }
+        
+        .step h3 {
+            margin-bottom: 15px;
+        }
+        
+        .step p {
+            color: var(--secondary);
+        }
+        
+        .step:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 30px;
+            right: -50px;
+            width: 100px;
+            height: 2px;
+            background-color: var(--primary);
+            opacity: 0.3;
+        }
+        
+        .games {
+            padding: 60px 0;
+            background-color: white;
+        }
+        
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        
+        .game-card {
+            background-color: var(--light);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .game-img {
+            height: 150px;
+            background-color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 50px;
+        }
+        
+        .game-content {
+            padding: 20px;
+        }
+        
+        .game-content h3 {
+            margin-bottom: 10px;
+        }
+        
+        .game-content p {
+            color: var(--secondary);
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .cta {
+            padding: 80px 0;
+            text-align: center;
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .cta h2 {
+            font-size: 36px;
+            margin-bottom: 20px;
+        }
+        
+        .cta p {
+            max-width: 600px;
+            margin: 0 auto 30px;
+            opacity: 0.9;
+        }
+        
+        .cta .btn {
+            background-color: white;
+            color: var(--primary);
+            font-weight: 600;
+        }
+        
+        .cta .btn:hover {
+            background-color: rgba(255, 255, 255, 0.9);
+        }
+        
+        footer {
+            background-color: var(--dark);
+            color: white;
+            padding: 50px 0 20px;
+        }
+        
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .footer-column h3 {
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+        
+        .footer-column ul {
+            list-style: none;
+        }
+        
+        .footer-column ul li {
+            margin-bottom: 10px;
+        }
+        
+        .footer-column a {
+            color: #adb5bd;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .footer-column a:hover {
+            color: white;
+        }
+        
+        .social-links {
+            display: flex;
+            gap: 15px;
+        }
+        
+        .social-links a {
+            color: white;
+            font-size: 20px;
+        }
+        
+        .copyright {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: #adb5bd;
+            font-size: 14px;
+        }
+        
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .hero h1 {
+                font-size: 36px;
+            }
+            
+            .hero p {
+                font-size: 18px;
+            }
+            
+            .step:not(:last-child)::after {
+                display: none;
+            }
+            
+            .step {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <i class="fas fa-lock"></i>
+                    <span>Provably Audited</span>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="#">Home</a></li>
+                    <li><a href="#">Games</a></li>
+                    <li><a href="#">How It Works</a></li>
+                    <li><a href="#">About</a></li>
+                    <li><a href="#" class="btn btn-outline">Login</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="container">
+            <h1>Transparent Gambling Simulations</h1>
+            <p>Provably Audited provides verifiable fairness in gambling simulations with complete data transparency and independent analysis.</p>
+            <a href="#" class="btn">Start Auditing Now</a>
+        </div>
+    </section>
+
+    <section class="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>Why Choose Provably Audited?</h2>
+                <p>Our platform offers unparalleled transparency in gambling simulations with cryptographic proof of fairness.</p>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <h3>Provably Fair</h3>
+                    <p>Every simulation is cryptographically verifiable to ensure complete fairness and transparency.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3>Raw Data Access</h3>
+                    <p>Receive the complete dataset from every simulation for your own independent analysis.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>Detailed Analysis</h3>
+                    <p>Comprehensive statistical breakdowns of each simulation to verify expected outcomes.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="how-it-works">
+        <div class="container">
+            <div class="section-title">
+                <h2>How It Works</h2>
+                <p>Three simple steps to verify the fairness of any gambling simulation</p>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>Run Simulation</h3>
+                    <p>Configure and run your desired gambling game simulation with our easy-to-use interface.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>Receive Data</h3>
+                    <p>Get the complete raw data output from the simulation including all random seeds and outcomes.</p>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>Verify Fairness</h3>
+                    <p>Use our analysis tools or your own methods to cryptographically verify the fairness of results.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="games">
+        <div class="container">
+            <div class="section-title">
+                <h2>Supported Games</h2>
+                <p>We support provably fair simulations for all popular gambling game types</p>
+            </div>
+            <div class="games-grid">
+                <a href="plinko.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-bullseye"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Plinko</h3>
+                        <p>Drop balls down a pegboard and watch them bounce randomly to determine your payout multiplier.</p>
+                        <span class="btn">Try Plinko</span>
+                    </div>
+                </a>
+                <a href="dice.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-dice"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Dice</h3>
+                        <p>Predict whether the roll will be over or under your chosen number with verifiable randomness.</p>
+                        <span class="btn">Try Dice</span>
+                    </div>
+                </a>
+                <a href="mines.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-bomb"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Mines</h3>
+                        <p>Find gems while avoiding mines in this strategic game of chance and risk management.</p>
+                        <span class="btn">Try Mines</span>
+                    </div>
+                </a>
+                <a href="wheel.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-redo"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Wheel</h3>
+                        <p>Spin the wheel of fortune and win multipliers based on where it lands, with verifiable results.</p>
+                        <span class="btn">Try Wheel</span>
+                    </div>
+                </a>
+                <a href="limbo.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Limbo</h3>
+                        <p>Predict how low the multiplier will go before it crashes, with adjustable risk levels.</p>
+                        <span class="btn">Try Limbo</span>
+                    </div>
+                </a>
+                <a href="flip.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Flip</h3>
+                        <p>Simple 50/50 coin flip game with verifiable fairness and adjustable parameters.</p>
+                        <span class="btn">Try Flip</span>
+                    </div>
+                </a>
+                <a href="pump.html" class="game-card">
+                    <div class="game-img">
+                        <i class="fas fa-tint"></i>
+                    </div>
+                    <div class="game-content">
+                        <h3>Pump</h3>
+                        <p>Watch the multiplier pump up and cash out before it crashes to secure your winnings.</p>
+                        <span class="btn">Try Pump</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="cta">
+        <div class="container">
+            <h2>Ready to Verify Game Fairness?</h2>
+            <p>Join thousands of users who trust Provably Audited for transparent gambling simulations and analysis.</p>
+            <a href="#" class="btn">Get Started for Free</a>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-column">
+                    <h3>Provably Audited</h3>
+                    <p>Making gambling simulations transparent and verifiable through cryptographic proof.</p>
+                    <div class="social-links">
+                        <a href="#"><i class="fab fa-twitter"></i></a>
+                        <a href="#"><i class="fab fa-github"></i></a>
+                        <a href="#"><i class="fab fa-discord"></i></a>
+                    </div>
+                </div>
+                <div class="footer-column">
+                    <h3>Games</h3>
+                    <ul>
+                        <li><a href="#">Dice Roll</a></li>
+                        <li><a href="#">Coin Flip</a></li>
+                        <li><a href="#">Card Draw</a></li>
+                        <li><a href="#">Slots</a></li>
+                        <li><a href="#">All Games</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Resources</h3>
+                    <ul>
+                        <li><a href="#">Documentation</a></li>
+                        <li><a href="#">API</a></li>
+                        <li><a href="#">Fairness Proof</a></li>
+                        <li><a href="#">Analysis Tools</a></li>
+                    </ul>
+                </div>
+                <div class="footer-column">
+                    <h3>Company</h3>
+                    <ul>
+                        <li><a href="#">About Us</a></li>
+                        <li><a href="#">Contact</a></li>
+                        <li><a href="#">Privacy Policy</a></li>
+                        <li><a href="#">Terms of Service</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>&copy; 2023 Provably Audited. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
