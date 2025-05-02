@@ -1,6 +1,6 @@
 import sys
 sys.path.append("C:/Code/Provably_Audited/Stake_Plinko")
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, Response
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os
@@ -111,6 +111,121 @@ def run_plinko_simulation():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/run_plinko_simulation_progress')
+def run_plinko_simulation_progress():
+    # Get parameters from query string
+    server_seed = request.args.get('serverSeed') or generate_server_seed()
+    client_seed = request.args.get('clientSeed') or generate_client_seed()
+    nonce_start = int(request.args.get('nonceStart'))
+    nonce_end = int(request.args.get('nonceEnd'))
+    risk = request.args.get('risk')
+    rows = int(request.args.get('rows'))
+    bet_size = float(request.args.get('betSize'))
+    
+    def generate():
+        try:
+            total_nonces = nonce_end - nonce_start + 1
+            # Calculate 0.1% of total nonces
+            point_one_percent = max(1, int(total_nonces / 1000))
+            
+            config = {
+                "ServerSeed": server_seed,
+                "ClientSeed": client_seed,
+                "MinimumNonce": nonce_start,
+                "MaximumNonce": nonce_end,
+                "Risk": risk,
+                "Rows": rows,
+                "BetSize": bet_size
+            }
+            
+            # Initialize counters
+            results = []
+            stats = {
+                "total_wins": 0,
+                "total_losses": 0,
+                "biggest_win_streak": 0,
+                "biggest_loss_streak": 0,
+                "current_win_streak": 0,
+                "current_loss_streak": 0,
+                "money_won": 0,
+                "top_multipliers": [],
+                "second_multipliers": [],
+                "third_multipliers": [],
+                "winning_streak_sizes":[],
+                "losing_streak_sizes":[]
+            }
+            
+            last_update = 0
+            # Process each nonce
+            for i, nonce in enumerate(range(nonce_start, nonce_end + 1)):
+                prize_index, multiplier = seeds_to_results(server_seed, client_seed, nonce, risk, rows)
+                results.append({
+                    "nonce": nonce,
+                    "prize index": prize_index,
+                    "multiplier": multiplier,
+                    "payout": f"${bet_size*multiplier:,.2f}"
+                })
+                stats["money_won"] += bet_size * multiplier
+                
+                if multiplier >= 1:
+                    stats["total_wins"] += 1
+                    stats["current_win_streak"] += 1
+                    if(stats["current_loss_streak"] > 0):
+                        stats['losing_streak_sizes'].append(stats["current_loss_streak"])
+                    stats["current_loss_streak"] = 0
+                    if stats["current_win_streak"] > stats["biggest_win_streak"]:
+                        stats["biggest_win_streak"] = stats["current_win_streak"]
+                else:
+                    stats["total_losses"] += 1
+                    stats["current_loss_streak"] += 1
+                    if(stats["current_win_streak"] > 0):
+                        stats['winning_streak_sizes'].append(stats["current_win_streak"])
+                    stats["current_win_streak"] = 0
+                    if stats["current_loss_streak"] > stats["biggest_loss_streak"]:
+                        stats["biggest_loss_streak"] = stats["current_loss_streak"]
+                
+                # Track top multipliers
+                if prize_index in [0, rows + 1]:
+                    stats["top_multipliers"].append(str(nonce))
+                elif prize_index in [1, rows]:
+                    stats["second_multipliers"].append(str(nonce))
+                elif prize_index in [2, rows - 1]:
+                    stats["third_multipliers"].append(str(nonce))
+                
+                # Calculate current progress percentage
+                current_progress = (i + 1) / total_nonces * 100
+                
+                # Send progress update if:
+                # 1. We've completed at least 0.1% more since last update OR
+                # 2. This is the last nonce OR
+                # 3. We're processing a small number of nonces (<1000)
+                if (current_progress - last_update >= 0.1 or 
+                    i == total_nonces - 1 or 
+                    total_nonces < 1000):
+                    yield f"data: {json.dumps({'progress': {'current': i + 1, 'total': total_nonces}})}\n\n"
+                    last_update = current_progress
+            
+            # Prepare final response
+            response = {
+                "config": config,
+                "stats": stats,
+                "results": results,
+                "analysis": generate_plinko_analysis_text(config, stats),
+                "server_seed_hashed": sha256_encrypt(config["ServerSeed"]),
+                "complete": True
+            }
+            
+            yield f"data: {json.dumps(response)}\n\n"
+            
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+    
+    return Response(generate(), mimetype='text/event-stream', headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no'  # For Nginx
+        })
 
 @app.route('/download_raw_data', methods=['POST'])
 def download_raw_data():
