@@ -235,6 +235,18 @@
     </style>
 </head>
 <body>
+    <!-- Add this right after the opening <body> tag -->
+    <div id="progressWindow" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.2); z-index: 1000; width: 400px; max-width: 90%;">
+        <h3 style="margin-bottom: 20px; text-align: center;">Running Simulation...</h3>
+        <div id="progressText" style="margin-bottom: 10px; text-align: center;">0.0% complete (0/0)</div>
+        <div style="height: 20px; background: #f0f0f0; border-radius: 10px; overflow: hidden;">
+            <div id="progressBar" style="height: 100%; width: 0%; background: var(--primary); transition: width 0.3s;"></div>
+        </div>
+        <div style="margin-top: 20px; text-align: center;">
+            <button id="cancelSimulation" class="btn btn-outline" style="padding: 8px 20px;">Cancel</button>
+        </div>
+    </div>
+    <div id="progressOverlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 999;"></div>
     <header>
         <div class="container">
             <nav>
@@ -398,20 +410,46 @@
     </footer>
 
     <script>
-        // Handle form submission
+        // Add these variables at the top of your script section
+        let simulationInProgress = false;
+        let cancelRequested = false;
+        let eventSource = null;
+
+        window.addEventListener('beforeunload', function() {
+            if (eventSource) eventSource.close();
+        });
+
+        // Add this function to update the progress
+        function updateProgress(current, total) {
+            const percent = ((current / total) * 100).toFixed(1);
+            document.getElementById('progressText').textContent = 
+                `${percent}% complete (${current}/${total})`;
+            document.getElementById('progressBar').style.width = `${percent}%`;
+        }
+
+        // Add this event listener for the cancel button
+        document.getElementById('cancelSimulation').addEventListener('click', function() {
+            cancelRequested = true;
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            if (simulationInProgress) {
+                document.getElementById('progressText').textContent = 'Canceling...';
+            }
+        });
+
+        // Modify the form submission handler to show progress
         document.getElementById('plinkoForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Show loading state
-            const resultsDiv = document.getElementById('results');
-            const resultsOutput = document.getElementById('resultsOutput');
-            const loadingDiv = document.getElementById('loading');
-            const downloadButtons = document.getElementById('downloadButtons');
+            // Reset cancel flag
+            cancelRequested = false;
+            simulationInProgress = true;
             
-            resultsDiv.style.display = 'block';
-            resultsOutput.textContent = '';
-            loadingDiv.style.display = 'block';
-            downloadButtons.style.display = 'none';
+            // Show progress window
+            document.getElementById('progressWindow').style.display = 'block';
+            document.getElementById('progressOverlay').style.display = 'block';
             
             // Get form values
             const serverSeed = document.getElementById('serverSeed').value;
@@ -425,92 +463,152 @@
             // Validate inputs
             if (nonceEnd < nonceStart) {
                 alert('Ending nonce must be greater than or equal to starting nonce');
-                loadingDiv.style.display = 'none';
+                hideProgressWindow();
                 return;
             }
             
-            if (nonceEnd - nonceStart > 10000) {
-                if (!confirm('You are about to run a large number of simulations. This may take a while. Continue?')) {
-                    loadingDiv.style.display = 'none';
-                    return;
-                }
-            }
+            const totalNonces = nonceEnd - nonceStart + 1;
             
-            // Send data to the Flask server
+            // Show loading state in results area
+            const resultsDiv = document.getElementById('results');
+            const resultsOutput = document.getElementById('resultsOutput');
+            const loadingDiv = document.getElementById('loading');
+            const downloadButtons = document.getElementById('downloadButtons');
+            
+            resultsDiv.style.display = 'block';
+            resultsOutput.textContent = '';
+            loadingDiv.style.display = 'block';
+            downloadButtons.style.display = 'none';
+            
+            // Initialize progress
+            updateProgress(0, totalNonces);
+            
             try {
-                const response = await fetch('http://localhost:5000/run_plinko_simulation', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        ServerSeed: serverSeed || generateRandomSeed(64),
-                        ClientSeed: clientSeed || generateRandomSeed(20),
-                        nonceStart: nonceStart,
-                        nonceEnd: nonceEnd,
-                        risk: risk,
-                        rows: rows,
-                        betSize: betSize
-                    }),
-                });
+                // Close any existing connection
+                if (eventSource) {
+                    eventSource.close();
+                    eventSource = null;
+                }
+
+                // Create a new EventSource for progress updates
+                eventSource = new EventSource(`http://localhost:5000/run_plinko_simulation_progress?serverSeed=${encodeURIComponent(serverSeed || generateRandomSeed(64))}&clientSeed=${encodeURIComponent(clientSeed || generateRandomSeed(20))}&nonceStart=${nonceStart}&nonceEnd=${nonceEnd}&risk=${encodeURIComponent(risk)}&rows=${rows}&betSize=${betSize}`);
                 
-                const data = await response.json();
+                let finalData = null;
                 
-                // Hide loading and display results
-                loadingDiv.style.display = 'none';
-                resultsOutput.textContent = data.analysis;
-                
-                // Show download buttons
-                downloadButtons.style.display = 'block';
-                
-                // Set up download handlers
-                document.getElementById('downloadRaw').onclick = async function() {
-                    try {
-                        const response = await fetch('http://localhost:5000/download_raw_data', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                results: data.results,  // Send the full results array
-                                stats:data.stats,       // Include stats for analysis
-                                config: data.config     // Include config for reference
-                            }),
-                        });
-                        const fileData = await response.json();
-                        downloadContent(fileData.content, fileData.filename);
-                    } catch (error) {
-                        console.error('Download failed:', error);
-                        alert('Download failed. Please try again.');
+                // Modify the eventSource.onmessage handler in your form submission
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.progress) {
+                        // Calculate percentage with more precision
+                        const percent = ((data.progress.current / data.progress.total) * 100).toFixed(2);
+                        document.getElementById('progressText').textContent = 
+                            `${percent}% complete (${data.progress.current}/${data.progress.total})`;
+                        document.getElementById('progressBar').style.width = `${percent}%`;
+                        
+                        // Check if simulation should be canceled
+                        if (cancelRequested) {
+                            eventSource.close();
+                            hideProgressWindow();
+                            loadingDiv.style.display = 'none';
+                            resultsOutput.textContent = 'Simulation canceled by user.';
+                            simulationInProgress = false;
+                        }
+                    }
+                    
+                    if (data.complete) {
+                        // Simulation complete
+                        eventSource.close();
+                        finalData = data;
+                        hideProgressWindow();
+                        
+                        // Hide loading and display results
+                        loadingDiv.style.display = 'none';
+                        resultsOutput.textContent = data.analysis;
+                        
+                        // Show download buttons
+                        downloadButtons.style.display = 'block';
+                        
+                        // Set up download handlers (existing code)
+                        document.getElementById('downloadRaw').onclick = async function() {
+                            try {
+                                const response = await fetch('http://localhost:5000/download_raw_data', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        results: finalData.results,
+                                        stats: finalData.stats,
+                                        config: finalData.config
+                                    }),
+                                });
+                                const fileData = await response.json();
+                                downloadContent(fileData.content, fileData.filename);
+                            } catch (error) {
+                                console.error('Download failed:', error);
+                                alert('Download failed. Please try again.');
+                            }
+                        };
+                        
+                        document.getElementById('downloadAnalysis').onclick = async function() {
+                            try {
+                                const response = await fetch('http://localhost:5000/download_analysis', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                        analysis: finalData.analysis,
+                                        config: finalData.config
+                                    }),
+                                });
+                                const fileData = await response.json();
+                                downloadContent(fileData.content, fileData.filename);
+                            } catch (error) {
+                                console.error('Download failed:', error);
+                                alert('Download failed. Please try again.');
+                            }
+                        };
+                        
+                        simulationInProgress = false;
+                    }
+                    
+                    if (data.error) {
+                        // Error occurred
+                        eventSource.close();
+                        hideProgressWindow();
+                        loadingDiv.style.display = 'none';
+                        resultsOutput.textContent = 'Error: ' + data.error;
+                        simulationInProgress = false;
                     }
                 };
                 
-                document.getElementById('downloadAnalysis').onclick = async function() {
-                    try {
-                        const response = await fetch('http://localhost:5000/download_analysis', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                            },
-                            body: JSON.stringify({
-                                analysis: data.analysis,
-                                config: data.config
-                            }),
-                        });
-                        const fileData = await response.json();
-                        downloadContent(fileData.content, fileData.filename);
-                    } catch (error) {
-                        console.error('Download failed:', error);
-                        alert('Download failed. Please try again.');
+                eventSource.onerror = function() {
+                    eventSource.close();
+                    if (!cancelRequested) {
+                        hideProgressWindow();
+                        loadingDiv.style.display = 'none';
+                        resultsOutput.textContent = 'Error: Connection to server failed.';
                     }
+                    simulationInProgress = false;
                 };
                 
             } catch (error) {
+                hideProgressWindow();
                 loadingDiv.style.display = 'none';
-                resultsOutput.textContent = 'Error: Failed to connect to the server.';
+                resultsOutput.textContent = 'Error: Failed to start simulation.';
                 console.error(error);
+                simulationInProgress = false;
             }
+            
         });
+
+        // Helper function to hide progress window
+        function hideProgressWindow() {
+            document.getElementById('progressWindow').style.display = 'none';
+            document.getElementById('progressOverlay').style.display = 'none';
+        }
 
         // Helper function to trigger downloads
         function downloadContent(content, filename) {
