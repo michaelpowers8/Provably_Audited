@@ -201,8 +201,8 @@
         }
         
         .results pre {
-            white-space: pre-wrap;
-            word-wrap: break-word;
+            white-space: pre;
+            word-wrap: normal;
             background-color: white;
             padding: 20px;
             border-radius: var(--border-radius);
@@ -335,6 +335,14 @@
                 
                 <div class="results" id="results">
                     <h3><i class="fas fa-chart-bar"></i> Simulation Analysis</h3>
+                    <div class="download-buttons" id="downloadButtons" style="display: none; margin-bottom: 20px;">
+                        <button id="downloadRaw" class="btn btn-outline" style="margin-right: 10px;">
+                            <i class="fas fa-download"></i> Download Raw Data
+                        </button>
+                        <button id="downloadAnalysis" class="btn btn-outline">
+                            <i class="fas fa-download"></i> Download Analysis
+                        </button>
+                    </div>
                     <div class="loading" id="loading">Processing simulation data...</div>
                     <pre id="resultsOutput"></pre>
                 </div>
@@ -391,17 +399,19 @@
 
     <script>
         // Handle form submission
-        document.getElementById('plinkoForm').addEventListener('submit', function(e) {
+        document.getElementById('plinkoForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             // Show loading state
             const resultsDiv = document.getElementById('results');
             const resultsOutput = document.getElementById('resultsOutput');
             const loadingDiv = document.getElementById('loading');
+            const downloadButtons = document.getElementById('downloadButtons');
             
             resultsDiv.style.display = 'block';
             resultsOutput.textContent = '';
             loadingDiv.style.display = 'block';
+            downloadButtons.style.display = 'none';
             
             // Get form values
             const serverSeed = document.getElementById('serverSeed').value;
@@ -426,22 +436,95 @@
                 }
             }
             
-            // Create configuration object
-            const config = {
-                ServerSeed: serverSeed || generateRandomSeed(64),
-                ClientSeed: clientSeed || generateRandomSeed(20),
-                MinimumNonce: nonceStart,
-                MaximumNonce: nonceEnd,
-                Risk: risk,
-                Rows: rows,
-                BetSize: betSize
-            };
-            
-            // For demo purposes, we'll simulate the results
-            // In a real implementation, you would send this to your Python backend
-            simulateResults(config);
+            // Send data to the Flask server
+            try {
+                const response = await fetch('http://localhost:5000/run_plinko_simulation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ServerSeed: serverSeed || generateRandomSeed(64),
+                        ClientSeed: clientSeed || generateRandomSeed(20),
+                        nonceStart: nonceStart,
+                        nonceEnd: nonceEnd,
+                        risk: risk,
+                        rows: rows,
+                        betSize: betSize
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading and display results
+                loadingDiv.style.display = 'none';
+                resultsOutput.textContent = data.analysis;
+                
+                // Show download buttons
+                downloadButtons.style.display = 'block';
+                
+                // Set up download handlers
+                document.getElementById('downloadRaw').onclick = async function() {
+                    try {
+                        const response = await fetch('http://localhost:5000/download_raw_data', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                results: data.results,  // Send the full results array
+                                stats:data.stats,       // Include stats for analysis
+                                config: data.config     // Include config for reference
+                            }),
+                        });
+                        const fileData = await response.json();
+                        downloadContent(fileData.content, fileData.filename);
+                    } catch (error) {
+                        console.error('Download failed:', error);
+                        alert('Download failed. Please try again.');
+                    }
+                };
+                
+                document.getElementById('downloadAnalysis').onclick = async function() {
+                    try {
+                        const response = await fetch('http://localhost:5000/download_analysis', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                analysis: data.analysis,
+                                config: data.config
+                            }),
+                        });
+                        const fileData = await response.json();
+                        downloadContent(fileData.content, fileData.filename);
+                    } catch (error) {
+                        console.error('Download failed:', error);
+                        alert('Download failed. Please try again.');
+                    }
+                };
+                
+            } catch (error) {
+                loadingDiv.style.display = 'none';
+                resultsOutput.textContent = 'Error: Failed to connect to the server.';
+                console.error(error);
+            }
         });
-        
+
+        // Helper function to trigger downloads
+        function downloadContent(content, filename) {
+            const blob = new Blob([content], { type: 'application/octet-stream' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
         // Generate a random seed
         function generateRandomSeed(length) {
             const chars = '0123456789abcdef';
@@ -452,46 +535,49 @@
             return result;
         }
         
-        // Simulate results (for demo purposes)
-        function simulateResults(config) {
-            // Show loading state
-            const resultsOutput = document.getElementById('resultsOutput');
-            const loadingDiv = document.getElementById('loading');
+        // Update the simulateResults function to be async
+    async function simulateResults(config) {
+        // Show loading state
+        const resultsOutput = document.getElementById('resultsOutput');
+        const loadingDiv = document.getElementById('loading');
+        
+        // Simulate delay for processing
+        setTimeout(async () => {  // Note the async here
+            loadingDiv.style.display = 'none';
             
-            // Simulate delay for processing
-            setTimeout(() => {
-                loadingDiv.style.display = 'none';
-                
-                // Generate fake results for demo
-                const totalGames = config.MaximumNonce - config.MinimumNonce + 1;
-                const wins = Math.floor(totalGames * 0.45);
-                const losses = totalGames - wins;
-                const netResult = (wins * config.BetSize * getAverageMultiplier(config.Risk, config.Rows)) - (totalGames * config.BetSize);
-                
-                // Get multipliers for display
-                const multipliers = getMultipliers(config.Risk, config.Rows);
-                const topMultiplier = multipliers[0];
-                const secondMultiplier = multipliers[1];
-                const thirdMultiplier = multipliers[2];
-                
-                // Count "hits" for top multipliers (for demo)
-                const topHits = Math.floor(totalGames * 0.01);
-                const secondHits = Math.floor(totalGames * 0.03);
-                const thirdHits = Math.floor(totalGames * 0.05);
-                
-                // Generate some example nonces with hits
-                const generateHitNonces = (count) => {
-                    const nonces = [];
-                    for (let i = 0; i < count; i++) {
-                        nonces.push(Math.floor(Math.random() * (config.MaximumNonce - config.MinimumNonce + 1)) + config.MinimumNonce);
-                    }
-                    return nonces.join(', ');
-                };
-                
-                // Format results similar to your Python output
-                resultsOutput.textContent = `PLINKO BALL ${config.Risk.toUpperCase()} RISK ${config.Rows} ROWS ANALYSIS
+            // Generate fake results for demo
+            const totalGames = config.MaximumNonce - config.MinimumNonce + 1;
+            const wins = Math.floor(totalGames * 0.45);
+            const losses = totalGames - wins;
+            const netResult = (wins * config.BetSize * getAverageMultiplier(config.Risk, config.Rows)) - (totalGames * config.BetSize);
+            
+            // Get multipliers for display
+            const multipliers = getMultipliers(config.Risk, config.Rows);
+            const topMultiplier = multipliers[0];
+            const secondMultiplier = multipliers[1];
+            const thirdMultiplier = multipliers[2];
+            
+            // Count "hits" for top multipliers (for demo)
+            const topHits = Math.floor(totalGames * 0.01);
+            const secondHits = Math.floor(totalGames * 0.03);
+            const thirdHits = Math.floor(totalGames * 0.05);
+            
+            // Generate some example nonces with hits
+            const generateHitNonces = (count) => {
+                const nonces = [];
+                for (let i = 0; i < count; i++) {
+                    nonces.push(Math.floor(Math.random() * (config.MaximumNonce - config.MinimumNonce + 1)) + config.MinimumNonce);
+                }
+                return nonces.join(', ');
+            };
+            
+            // Get the hashed server seed
+            const hashedServerSeed = await sha256(config.ServerSeed);  // Note the await here
+            
+            // Format results similar to your Python output
+            resultsOutput.textContent = `PLINKO BALL ${config.Risk.toUpperCase()} RISK ${config.Rows} ROWS ANALYSIS
 Server Seed: ${config.ServerSeed}
-Server Seed (Hashed): ${sha256(config.ServerSeed)}
+Server Seed (Hashed): ${hashedServerSeed}
 Client Seed: ${config.ClientSeed}
 Nonces: ${config.MinimumNonce.toLocaleString()} - ${config.MaximumNonce.toLocaleString()}
 Number of games simulated: ${totalGames.toLocaleString()}
@@ -515,46 +601,55 @@ Number of ${secondMultiplier}x multipliers: ${secondHits}
 Nonces with ${secondMultiplier}x: ${generateHitNonces(secondHits)}
 Number of ${thirdMultiplier}x multipliers: ${thirdHits}
 Nonces with ${thirdMultiplier}x: ${generateHitNonces(thirdHits)}`;
-            }, 1500);
-        }
+        }, 1500);
+    }
+    
+    // Get average multiplier for RTP calculation
+    function getAverageMultiplier(risk, rows) {
+        // Simplified average multiplier for demo
+        const averages = {
+            'Low': 1.2,
+            'Medium': 1.5,
+            'High': 2.0
+        };
+        return averages[risk] || 1.0;
+    }
+    
+    // Get multipliers for display
+    function getMultipliers(risk, rows) {
+        // This would normally come from your Multipliers.py data
+        // For demo purposes, we'll use some example values
+        const multiplierSets = {
+            'Low16': [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
+            'Medium16': [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110],
+            'High16': [1000, 130, 26, 9, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 9, 26, 130, 1000]
+        };
         
-        // Get average multiplier for RTP calculation
-        function getAverageMultiplier(risk, rows) {
-            // Simplified average multiplier for demo
-            const averages = {
-                'Low': 1.2,
-                'Medium': 1.5,
-                'High': 2.0
-            };
-            return averages[risk] || 1.0;
+        const key = `${risk}${rows}`;
+        if (multiplierSets[key]) {
+            return [
+                multiplierSets[key][0],
+                multiplierSets[key][1],
+                multiplierSets[key][2]
+            ];
         }
+        return [10, 5, 2]; // Default values
+    }
+    
+    // Proper SHA-256 function using Web Crypto API
+    async function sha256(input) {
+        // Encode the input as UTF-8
+        const msgBuffer = new TextEncoder().encode(input);
         
-        // Get multipliers for display
-        function getMultipliers(risk, rows) {
-            // This would normally come from your Multipliers.py data
-            // For demo purposes, we'll use some example values
-            const multiplierSets = {
-                'Low16': [16, 9, 2, 1.4, 1.4, 1.2, 1.1, 1, 0.5, 1, 1.1, 1.2, 1.4, 1.4, 2, 9, 16],
-                'Medium16': [110, 41, 10, 5, 3, 1.5, 1, 0.5, 0.3, 0.5, 1, 1.5, 3, 5, 10, 41, 110],
-                'High16': [1000, 130, 26, 9, 4, 2, 0.2, 0.2, 0.2, 0.2, 0.2, 2, 4, 9, 26, 130, 1000]
-            };
-            
-            const key = `${risk}${rows}`;
-            if (multiplierSets[key]) {
-                return [
-                    multiplierSets[key][0],
-                    multiplierSets[key][1],
-                    multiplierSets[key][2]
-                ];
-            }
-            return [10, 5, 2]; // Default values
-        }
+        // Hash the input
+        const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
         
-        // Simple SHA-256 function for demo purposes
-        function sha256(input) {
-            // In a real implementation, use a proper SHA-256 library
-            return 'hashed_' + input.substring(0, 10) + '...';
-        }
+        // Convert the ArrayBuffer to hex string
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        
+        return hashHex;
+    }
     </script>
 </body>
 </html>
