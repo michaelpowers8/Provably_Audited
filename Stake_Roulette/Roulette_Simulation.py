@@ -229,30 +229,40 @@ if __name__ == "__main__":
     DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_csv(f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
     with open(f"ROULETTE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
         file.write(f"""ROULETTE ANALYSIS
+
 Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
+
 Total Games Played: {total_games_played:,.0f}
 Total Money Wagered: ${total_money_bet:,.2f}
 Gross Winnings: ${money_won:,.2f}
 Net Winnings: ${abs(total_money_bet-money_won):,.2f} {"won" if money_won-total_money_bet>0 else "lost"}
 Return to Player (RTP): {round((money_won/total_money_bet)*100,2)}%
+
 Number of Wins: {total_number_of_wins:,.0f}
 Number of Partial Losses: {num_games_without_total_loss:,.0f}
 Number of Total Losses: {num_games_with_total_loss:,.0f}
+
 Number of Single Bets Won: {num_single_number_bets_hit:,.0f}
+
 Number of Black: {num_black:,.0f}
 Number of Red: {num_red:,.0f}
+
 Number of Even: {num_evens:,.0f}
 Number of Odds: {num_odds:,.0f}
+
 Number of 1-18: {num_1_to_18:,.0f}
 Number of 19-36: {num_19_to_36:,.0f}
+
 Number of 1-12: {num_1_to_12:,.0f}
 Number of 13-24: {num_13_to_24:,.0f}
 Number of 25-36: {num_25_to_36:,.0f}
+
 Number of Vertical Column 1: {num_column_1:,.0f}
 Number of Vertical Column 2: {num_column_2:,.0f}
 Number of Vertical Column 3: {num_column_3:,.0f}
+
 Number of 0's: {len(nonces_with_result_0):,.0f}
 Nonces Resulting in 0: {"|".join(nonces_with_result_0)}""")
