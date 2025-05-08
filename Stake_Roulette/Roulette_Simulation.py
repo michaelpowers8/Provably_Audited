@@ -5,6 +5,7 @@ import string
 from math import floor
 import json
 from pandas import DataFrame
+from fpdf import FPDF
 
 def generate_server_seed():
     possible_characters:str = string.hexdigits
@@ -63,63 +64,99 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> str:
             if(len(row)==1):
                 return row[0]
 
+def generate_analysis_pdf(analysis_data:dict[str,str], filename:str):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
+    
+    # --- Page 1: Summary ---
+    pdf.add_page()
+    pdf.set_font("Arial", size=18, style='B')
+    pdf.cell(200, 10, txt="ROULETTE ANALYSIS - SUMMARY", ln=True, align='C')
+    pdf.set_font("Arial", size=12)
+    for text in analysis_data["summary"].split('\n'):
+        pdf.cell(0, 10, txt=text, border=0, ln=True)
+    
+    # --- Page 2: Color Analysis ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Arial", size=18, style='B')
+    pdf.cell(200, 10, txt="COLOR ANALYSIS", ln=True, align='C')
+    pdf.set_font("Arial", size=12)
+    for text in analysis_data["colors"].split('\n'):
+        pdf.cell(0, 10, txt=text, border=0, ln=True)
+    
+    # --- Page 3: 1-18 / 19-36 Analysis ---
+    pdf.add_page()
+    pdf.set_font("Arial", size=14, style='B')
+    pdf.cell(200, 10, txt="NUMBER RANGE ANALYSIS", ln=True, align='C')
+    pdf.set_font("Arial", size=11)
+    pdf.multi_cell(0, 10, txt=analysis_data["dozens"])
+    
+    # Add more pages as needed...
+    
+    pdf.output(filename)
+
 if __name__ == "__main__":
     with open("Configuration.json","rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
-    # Configuration Variables
-    server:str = configuration["ServerSeed"]
-    server_hashed:str = sha256_encrypt(server)
-    client:str = configuration["ClientSeed"]
-    nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
-    single_number_bets:dict[str,float|int] = configuration["SingleNumberBets"]
-    vertical_column_bets:dict[str,float|int] = configuration["VerticalColumnBets"]
-    dozen_bets:dict[str,float|int] = configuration["DozenBets"]
-    one_to_one_bets:dict[str,float|int] = configuration["OnetoOneBets"]
-    roulette_numbers_colors:dict[str,str] = configuration["RouletteColors"]
+    if(True):
+        # Configuration Variables
+        server:str = configuration["ServerSeed"]
+        server_hashed:str = sha256_encrypt(server)
+        client:str = configuration["ClientSeed"]
+        nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
+        single_number_bets:dict[str,float|int] = configuration["SingleNumberBets"]
+        vertical_column_bets:dict[str,float|int] = configuration["VerticalColumnBets"]
+        dozen_bets:dict[str,float|int] = configuration["DozenBets"]
+        one_to_one_bets:dict[str,float|int] = configuration["OnetoOneBets"]
+        roulette_numbers_colors:dict[str,str] = configuration["RouletteColors"]
 
-    results:list[list[float|int]] = []
-    current_result:list[int] = []
+        results:list[list[float|int]] = []
+        current_result:list[int] = []
 
-    biggest_winning_streak:tuple[int,int] = (0,0)
-    biggest_losing_streak:tuple[int,int] = (0,0)
+        biggest_winning_streak:tuple[int,int] = (0,0)
+        biggest_losing_streak:tuple[int,int] = (0,0)
 
-    current_winning_streak:int = 0
-    current_losing_streak:int = 0
+        current_winning_streak:int = 0
+        current_losing_streak:int = 0
 
-    total_number_of_wins:int = 0
-    total_number_of_losses:int = 0
+        total_number_of_wins:int = 0
+        total_number_of_losses:int = 0
 
-    total_games_played:int = 0
-    total_money_bet:float = 0
+        total_games_played:int = 0
+        total_money_bet:float = 0
 
-    money_won:float = 0
-    round_winnings:float = 0
-    round_bettings:float = 0
-    num_games_with_net_profit:int = 0
-    num_games_without_total_loss:int = 0
-    num_games_with_total_loss:int = 0
+        money_won:float = 0
+        round_winnings:float = 0
+        round_bettings:float = 0
+        num_games_with_net_profit:int = 0
+        num_games_without_total_loss:int = 0
+        num_games_with_total_loss:int = 0
 
-    num_1_to_12:int = 0
-    num_13_to_24:int = 0
-    num_25_to_36:int = 0
+        num_1_to_12:int = 0
+        num_13_to_24:int = 0
+        num_25_to_36:int = 0
 
-    num_column_1:int = 0
-    num_column_2:int = 0
-    num_column_3:int = 0
+        num_column_1:int = 0
+        num_column_2:int = 0
+        num_column_3:int = 0
 
-    num_1_to_18:int = 0
-    num_19_to_36:int = 0
+        num_1_to_18:int = 0
+        num_19_to_36:int = 0
 
-    num_evens:int = 0
-    num_odds:int = 0
+        num_evens:int = 0
+        num_odds:int = 0
 
-    num_red:int = 0
-    num_black:int = 0
+        num_red:int = 0
+        biggest_red_streak:int = 0
+        current_red_streak:int = 0
+        num_black:int = 0
+        biggest_black_streak:int = 0
+        current_black_streak:int = 0
 
-    num_single_number_bets_hit:int = 0
+        num_single_number_bets_hit:int = 0
 
-    nonces_with_result_0:list[int] = []
+        nonces_with_result_0:list[int] = []
 
     for nonce in nonces:
         total_games_played += 1
@@ -165,8 +202,16 @@ if __name__ == "__main__":
         # Declare which color the result is (Green Zero Excluded)
         if(roulette_numbers_colors[str(seed_result)]=='Black'):
             num_black += 1
+            current_black_streak += 1
+            if(current_red_streak > biggest_red_streak):
+                biggest_red_streak = current_red_streak
+            current_red_streak = 0
         elif(roulette_numbers_colors[str(seed_result)]=="Red"):
             num_red += 1
+            current_red_streak += 1
+            if(current_black_streak > biggest_black_streak):
+                biggest_black_streak = current_black_streak
+            current_black_streak = 0
         
         # Checking if result is 0 and adding it to analysis statistics
         if(seed_result==0):
@@ -227,42 +272,46 @@ if __name__ == "__main__":
         current_result.extend([seed_result,round_bettings,round_winnings,roulette_numbers_colors[str(seed_result)]])
         results.append(current_result)
     DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_csv(f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
-    with open(f"ROULETTE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
-        file.write(f"""ROULETTE ANALYSIS
-
-Server Seed: {server}
+    analysis_data:dict[str,int|float|str] = {
+        "summary":f"""Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
-
 Total Games Played: {total_games_played:,.0f}
-Total Money Wagered: ${total_money_bet:,.2f}
-Gross Winnings: ${money_won:,.2f}
-Net Winnings: ${abs(total_money_bet-money_won):,.2f} {"won" if money_won-total_money_bet>0 else "lost"}
-Return to Player (RTP): {round((money_won/total_money_bet)*100,2)}%
-
 Number of Wins: {total_number_of_wins:,.0f}
 Number of Partial Losses: {num_games_without_total_loss:,.0f}
 Number of Total Losses: {num_games_with_total_loss:,.0f}
+Total Money Wagered: ${total_money_bet:,.2f}
+Gross Winnings: ${money_won:,.2f}
+Net Winnings: ${abs(total_money_bet-money_won):,.2f} {"won" if money_won-total_money_bet>0 else "lost"}
+Return to Player (RTP): {round((money_won/total_money_bet)*100,2)}%""",
 
-Number of Single Bets Won: {num_single_number_bets_hit:,.0f}
+        "single_bets":f"""Number of Single Bets Won: {num_single_number_bets_hit:,.0f}""",
 
-Number of Black: {num_black:,.0f}
-Number of Red: {num_red:,.0f}
+        "colors":f"""Theoretical Number of Blacks: {((18/37)*total_games_played):,.2f}
+Actual Number of Blacks: {num_black:,.0f}
+Theoretical Percent of Blacks: {(18/37)*100:,.2f}%
+Actual Percent of Blacks: {(num_black/total_games_played)*100:,.2f}%
+Error: {(1-(min([((18/37)*total_games_played),num_black])/max([((18/37)*total_games_played),num_black])))*100:,.3f}%
+{'-'*130}
+Theoretical Number of Reds: {((18/37)*total_games_played):,.2f}
+Actual Number of Reds: {num_red:,.0f}
+Theoretical Percent of Reds: {(18/37)*100:,.2f}%
+Actual Percent of Reds: {(num_red/total_games_played)*100:,.2f}%
+Error: {(1-(min([((18/37)*total_games_played),num_red])/max([((18/37)*total_games_played),num_red])))*100:,.3f}%""",
 
-Number of Even: {num_evens:,.0f}
-Number of Odds: {num_odds:,.0f}
+        "even_odd":f"""Number of Even: {num_evens:,.0f}\nNumber of Odds: {num_odds:,.0f}""",
 
-Number of 1-18: {num_1_to_18:,.0f}
-Number of 19-36: {num_19_to_36:,.0f}
+        "half_the_numbers":f"""Number of 1-18: {num_1_to_18:,.0f}\nNumber of 19-36: {num_19_to_36:,.0f}""",
 
-Number of 1-12: {num_1_to_12:,.0f}
+        "dozens":f"""Number of 1-12: {num_1_to_12:,.0f}
 Number of 13-24: {num_13_to_24:,.0f}
-Number of 25-36: {num_25_to_36:,.0f}
+Number of 25-36: {num_25_to_36:,.0f}""",
 
-Number of Vertical Column 1: {num_column_1:,.0f}
+        "vertical_columns":f"""Number of Vertical Column 1: {num_column_1:,.0f}
 Number of Vertical Column 2: {num_column_2:,.0f}
-Number of Vertical Column 3: {num_column_3:,.0f}
+Number of Vertical Column 3: {num_column_3:,.0f}""",
 
-Number of 0's: {len(nonces_with_result_0):,.0f}
-Nonces Resulting in 0: {"|".join(nonces_with_result_0)}""")
+        "zeros":f"""Number of 0's: {len(nonces_with_result_0):,.0f}\nNonces Resulting in 0: {"|".join(nonces_with_result_0)}"""
+    }
+    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf")
