@@ -2,10 +2,13 @@ import hmac
 import hashlib
 import random
 import string
+from io import BytesIO
 from math import floor
 import json
 from pandas import DataFrame
-from fpdf import FPDF
+from fpdf import FPDF,XPos,YPos
+import matplotlib.pyplot as plt
+from PIL import Image,ImageFile
 
 def generate_server_seed():
     possible_characters:str = string.hexdigits
@@ -64,32 +67,38 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> str:
             if(len(row)==1):
                 return row[0]
 
-def generate_analysis_pdf(analysis_data:dict[str,str], filename:str):
+def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffer:BytesIO):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
     
     # --- Page 1: Summary ---
     pdf.add_page()
-    pdf.set_font("Arial", size=18, style='B')
-    pdf.cell(200, 10, txt="ROULETTE ANALYSIS - SUMMARY", ln=True, align='C')
-    pdf.set_font("Arial", size=12)
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="ROULETTE ANALYSIS - SUMMARY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=12)
     for text in analysis_data["summary"].split('\n'):
-        pdf.cell(0, 10, txt=text, border=0, ln=True)
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
     # --- Page 2: Color Analysis ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Arial", size=18, style='B')
-    pdf.cell(200, 10, txt="COLOR ANALYSIS", ln=True, align='C')
-    pdf.set_font("Arial", size=12)
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="RED/BLACK ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=12)
     for text in analysis_data["colors"].split('\n'):
-        pdf.cell(0, 10, txt=text, border=0, ln=True)
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    # --- Page 3: Color Trend ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="RED/BLACK TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffer, x=8, y=30, w=190, h=160)  # No filename needed!
     
     # --- Page 3: 1-18 / 19-36 Analysis ---
     pdf.add_page()
-    pdf.set_font("Arial", size=14, style='B')
-    pdf.cell(200, 10, txt="NUMBER RANGE ANALYSIS", ln=True, align='C')
-    pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0, 10, txt=analysis_data["dozens"])
+    pdf.set_font("Helvetica", size=14, style='B')
+    pdf.cell(200, 10, text="NUMBER RANGE ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=11)
+    pdf.multi_cell(0, 10, text=analysis_data["dozens"])
     
     # Add more pages as needed...
     
@@ -125,6 +134,7 @@ if __name__ == "__main__":
 
         total_games_played:int = 0
         total_money_bet:float = 0
+        cumulative_games:list[int] = []
 
         money_won:float = 0
         round_winnings:float = 0
@@ -151,8 +161,11 @@ if __name__ == "__main__":
         biggest_red_streak:int = 0
         current_red_streak:int = 0
         num_black:int = 0
+        cumulative_reds:list[int] = []
+
         biggest_black_streak:int = 0
         current_black_streak:int = 0
+        cumulative_blacks:list[int] = []
 
         num_single_number_bets_hit:int = 0
 
@@ -160,6 +173,7 @@ if __name__ == "__main__":
 
     for nonce in nonces:
         total_games_played += 1
+        cumulative_games.append(total_games_played)
         current_result = [server,client,nonce]
         seed_result = seeds_to_results(server_seed=server,client_seed=client,nonce=nonce)
         
@@ -212,6 +226,8 @@ if __name__ == "__main__":
             if(current_black_streak > biggest_black_streak):
                 biggest_black_streak = current_black_streak
             current_black_streak = 0
+        cumulative_blacks.append(num_black)
+        cumulative_reds.append(num_red)
         
         # Checking if result is 0 and adding it to analysis statistics
         if(seed_result==0):
@@ -284,7 +300,10 @@ Number of Total Losses: {num_games_with_total_loss:,.0f}
 Total Money Wagered: ${total_money_bet:,.2f}
 Gross Winnings: ${money_won:,.2f}
 Net Winnings: ${abs(total_money_bet-money_won):,.2f} {"won" if money_won-total_money_bet>0 else "lost"}
-Return to Player (RTP): {round((money_won/total_money_bet)*100,2)}%""",
+Theoretical House Edge: 2.70%
+Theoretical Return to Player (RTP): 97.30%
+Actual House Edge: {(1-(money_won/total_money_bet))*100:,.2f}%
+Return to Player (RTP): {(money_won/total_money_bet)*100:,.2f}%""",
 
         "single_bets":f"""Number of Single Bets Won: {num_single_number_bets_hit:,.0f}""",
 
@@ -293,12 +312,20 @@ Actual Number of Blacks: {num_black:,.0f}
 Theoretical Percent of Blacks: {(18/37)*100:,.2f}%
 Actual Percent of Blacks: {(num_black/total_games_played)*100:,.2f}%
 Error: {(1-(min([((18/37)*total_games_played),num_black])/max([((18/37)*total_games_played),num_black])))*100:,.3f}%
+Largest Streak of Blacks: {biggest_black_streak:,.0f}
+Money Wagered on Black: ${one_to_one_bets['Black']*total_games_played:,.2f}
+Gross Winnings on Black: ${one_to_one_bets['Black']*num_black*2:,.2f}
+Net Winnings on Black: ${abs((one_to_one_bets['Black']*total_games_played)-(one_to_one_bets['Black']*num_black*2)):,.2f} {"won" if (one_to_one_bets['Black']*num_black*2)-(one_to_one_bets['Black']*total_games_played)>0 else "lost"}
 {'-'*130}
 Theoretical Number of Reds: {((18/37)*total_games_played):,.2f}
 Actual Number of Reds: {num_red:,.0f}
 Theoretical Percent of Reds: {(18/37)*100:,.2f}%
 Actual Percent of Reds: {(num_red/total_games_played)*100:,.2f}%
-Error: {(1-(min([((18/37)*total_games_played),num_red])/max([((18/37)*total_games_played),num_red])))*100:,.3f}%""",
+Error: {(1-(min([((18/37)*total_games_played),num_red])/max([((18/37)*total_games_played),num_red])))*100:,.3f}%
+Largest Streak of Reds: {biggest_red_streak:,.0f}
+Money Wagered on Red: ${one_to_one_bets['Red']*total_games_played:,.2f}
+Gross Winnings on Red: ${one_to_one_bets['Red']*num_red*2:,.2f}
+Net Winnings on Red: ${abs((one_to_one_bets['Red']*total_games_played)-(one_to_one_bets['Red']*num_red*2)):,.2f} {"won" if (one_to_one_bets['Red']*num_red*2)-(one_to_one_bets['Red']*total_games_played)>0 else "lost"}""",
 
         "even_odd":f"""Number of Even: {num_evens:,.0f}\nNumber of Odds: {num_odds:,.0f}""",
 
@@ -314,4 +341,22 @@ Number of Vertical Column 3: {num_column_3:,.0f}""",
 
         "zeros":f"""Number of 0's: {len(nonces_with_result_0):,.0f}\nNonces Resulting in 0: {"|".join(nonces_with_result_0)}"""
     }
-    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf")
+
+    plt.figure(figsize=(10, 6))
+    plt.plot(cumulative_games, cumulative_reds, label="Reds", color="red", linewidth=2)
+    plt.plot(cumulative_games, cumulative_blacks, label="Blacks", color="black", linewidth=2)
+    plt.xlabel("Total Games Played")
+    plt.ylabel("Cumulative Count")
+    plt.title("Red vs Black Outcomes Over Time")
+    plt.legend()
+    plt.grid(True)
+
+    # Save the plot to a bytes buffer (instead of a file)
+    img_buffer:BytesIO = BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
+    plt.close()  # Free memory
+    img_buffer.seek(0)  # Rewind buffer to start
+
+    pil_img:ImageFile = Image.open(img_buffer)
+
+    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",img_buffer)
