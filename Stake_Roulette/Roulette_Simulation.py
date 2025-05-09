@@ -105,13 +105,20 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.set_font("Helvetica", size=18, style='B')
     pdf.cell(200, 10, text="BALANCE OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[2], x=8, y=30, w=190)  # No filename needed!
+
+    # --- Page 6: 1-18 and 19-36 Analysis ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="1-18 & 19-36 ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=12)
+    for text in analysis_data["half_the_numbers"].split('\n'):
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
-    # --- Page 3: 1-18 / 19-36 Analysis ---
+    # --- Page 7: 1-18 / 19-36 Analysis ---
     pdf.add_page()
     pdf.set_font("Helvetica", size=18, style='B')
-    pdf.cell(200, 10, text="NUMBER RANGE ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.set_font("Helvetica", size=12)
-    pdf.multi_cell(0, 10, text=analysis_data["dozens"])
+    pdf.cell(200, 10, text="1-18 vs 19-36 TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffers[3], x=8, y=30, w=190, h=160)  # No filename needed!
     
     # Add more pages as needed...
     
@@ -177,6 +184,26 @@ def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
+def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_one_1:list[int],cumulative_one_to_one_2:list[int],label_1:str,label_2:str,color_1:str,color_2:str):
+    plt.figure(figsize=(10, 6))
+    plt.plot(cumulative_games, cumulative_one_to_one_1, label=label_1, color=color_1, linewidth=2)
+    plt.plot(cumulative_games, cumulative_one_to_one_2, label=label_2, color=color_2, linewidth=2)
+    plt.xlabel("Total Games Played")
+    plt.ylabel("Cumulative Count")
+    plt.title("Red vs Black Outcomes Over Time")
+    plt.legend()
+    plt.grid(True)
+    # Apply formatter to both axes
+    plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+
+    # Save the plot to a bytes buffer (instead of a file)
+    img_buffer:BytesIO = BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
+    plt.close()  # Free memory
+    img_buffer.seek(0)  # Rewind buffer to start
+    return img_buffer
+
 if __name__ == "__main__":
     with open("Configuration.json","rb") as file:
         configuration:dict[str,str|int] = json.load(file)
@@ -227,7 +254,14 @@ if __name__ == "__main__":
         num_column_3:int = 0
 
         num_1_to_18:int = 0
+        biggest_1_to_18_streak:int = 0
+        current_1_to_18_streak:int = 0
+        cumulative_1_to_18:list[int] = []
+
         num_19_to_36:int = 0
+        biggest_19_to_36_streak:int = 0
+        current_19_to_36_streak:int = 0
+        cumulative_19_to_36:list[int] = []
 
         num_evens:int = 0
         num_odds:int = 0
@@ -284,8 +318,18 @@ if __name__ == "__main__":
         # Declare which half of numbers the result lies (Zero excluded)
         if(seed_result>=1 and seed_result<=18):
             num_1_to_18 += 1
+            current_1_to_18_streak += 1
+            if(current_19_to_36_streak > biggest_19_to_36_streak):
+                biggest_19_to_36_streak = current_19_to_36_streak
+            current_19_to_36_streak = 0
         elif(seed_result>=19 and seed_result<=36):
             num_19_to_36 += 1
+            current_19_to_36_streak += 1
+            if(current_1_to_18_streak > biggest_1_to_18_streak):
+                biggest_1_to_18_streak = current_1_to_18_streak
+            current_1_to_18_streak = 0
+        cumulative_1_to_18.append(num_1_to_18)
+        cumulative_19_to_36.append(num_19_to_36)
 
         # Declare if the result is even or odd (Zero is excluded)
         if((seed_result>0)and(seed_result%2==0)):
@@ -409,9 +453,27 @@ Money Wagered on Red: ${one_to_one_bets['Red']*total_games_played:,.2f}
 Gross Winnings on Red: ${one_to_one_bets['Red']*num_red*2:,.2f}
 Net Winnings on Red: ${abs((one_to_one_bets['Red']*total_games_played)-(one_to_one_bets['Red']*num_red*2)):,.2f} {"won" if (one_to_one_bets['Red']*num_red*2)-(one_to_one_bets['Red']*total_games_played)>0 else "lost"}""",
 
-        "even_odd":f"""Number of Even: {num_evens:,.0f}\nNumber of Odds: {num_odds:,.0f}""",
+        "half_the_numbers":f"""Theoretical Number of 1-18: {((18/37)*total_games_played):,.2f}
+Actual Number of 1-18: {num_1_to_18:,.0f}
+Theoretical Percent of 1-18: {(18/37)*100:,.2f}%
+Actual Percent of 1-18: {(num_1_to_18/total_games_played)*100:,.2f}%
+Error: {(1-(min([((18/37)*total_games_played),num_1_to_18])/max([((18/37)*total_games_played),num_1_to_18])))*100:,.3f}%
+Largest Streak of 1-18: {biggest_black_streak:,.0f}
+Money Wagered on 1-18: ${one_to_one_bets['1-18']*total_games_played:,.2f}
+Gross Winnings on 1-18: ${one_to_one_bets['1-18']*num_1_to_18*2:,.2f}
+Net Winnings on 1-18: ${abs((one_to_one_bets['1-18']*total_games_played)-(one_to_one_bets['1-18']*num_black*2)):,.2f} {"won" if (one_to_one_bets['1-18']*num_black*2)-(one_to_one_bets['1-18']*total_games_played)>0 else "lost"}
+{'-'*130}
+Theoretical Number of 19-36: {((18/37)*total_games_played):,.2f}
+Actual Number of 19-36: {num_19_to_36:,.0f}
+Theoretical Percent of 19-36: {(18/37)*100:,.2f}%
+Actual Percent of 19-36: {(num_19_to_36/total_games_played)*100:,.2f}%
+Error: {(1-(min([((18/37)*total_games_played),num_19_to_36])/max([((18/37)*total_games_played),num_19_to_36])))*100:,.3f}%
+Largest Streak of 19-36: {biggest_19_to_36_streak:,.0f}
+Money Wagered on 19-36: ${one_to_one_bets['19-36']*total_games_played:,.2f}
+Gross Winnings on 19-36: ${one_to_one_bets['19-36']*num_19_to_36*2:,.2f}
+Net Winnings on 19-36: ${abs((one_to_one_bets['19-36']*total_games_played)-(one_to_one_bets['19-36']*num_red*2)):,.2f} {"won" if (one_to_one_bets['19-36']*num_red*2)-(one_to_one_bets['19-36']*total_games_played)>0 else "lost"}""",
 
-        "half_the_numbers":f"""Number of 1-18: {num_1_to_18:,.0f}\nNumber of 19-36: {num_19_to_36:,.0f}""",
+        "even_odd":f"""Number of Even: {num_evens:,.0f}\nNumber of Odds: {num_odds:,.0f}""",
 
         "dozens":f"""Number of 1-12: {num_1_to_12:,.0f}
 Number of 13-24: {num_13_to_24:,.0f}
@@ -424,24 +486,8 @@ Number of Vertical Column 3: {num_column_3:,.0f}""",
         "zeros":f"""Number of 0's: {len(nonces_with_result_0):,.0f}\nNonces Resulting in 0: {"|".join(nonces_with_result_0)}"""
     }
 
-    if(True): # Red vs Black Analysis
-        plt.figure(figsize=(10, 6))
-        plt.plot(cumulative_games, cumulative_reds, label="Reds", color="red", linewidth=2)
-        plt.plot(cumulative_games, cumulative_blacks, label="Blacks", color="black", linewidth=2)
-        plt.xlabel("Total Games Played")
-        plt.ylabel("Cumulative Count")
-        plt.title("Red vs Black Outcomes Over Time")
-        plt.legend()
-        plt.grid(True)
-        # Apply formatter to both axes
-        plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
-        plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
-
-        # Save the plot to a bytes buffer (instead of a file)
-        img_buffer_red_black:BytesIO = BytesIO()
-        plt.savefig(img_buffer_red_black, format='png', dpi=300, bbox_inches="tight")
-        plt.close()  # Free memory
-        img_buffer_red_black.seek(0)  # Rewind buffer to start
+    img_buffer_red_black:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_reds,cumulative_blacks,'Reds','Blacks','red','black')
+    img_buffer_1_to_18_19_to_36:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_1_to_18,cumulative_19_to_36,'1-18','19-36','blue','orange')
 
     if(True): # Cumulative Balance Over Time
         plt.figure(figsize=(10, 6))
@@ -460,4 +506,4 @@ Number of Vertical Column 3: {num_column_3:,.0f}""",
         plt.close()  # Free memory
         img_buffer_balance.seek(0)  # Rewind buffer to start
 
-    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",[img_buffer_red_black,plot_occurrences(single_number_occurrences),img_buffer_balance])
+    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",[img_buffer_red_black,plot_occurrences(single_number_occurrences),img_buffer_balance,img_buffer_1_to_18_19_to_36])
