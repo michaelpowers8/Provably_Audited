@@ -119,6 +119,20 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.set_font("Helvetica", size=18, style='B')
     pdf.cell(200, 10, text="1-18 vs 19-36 TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[3], x=8, y=30, w=190, h=160)  # No filename needed!
+
+    # --- Page 8: Even/Odd Analysis ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="EVEN/ODD ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=12)
+    for text in analysis_data["even_odd"].split('\n'):
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    # --- Page 9: Even/Odd Analysis ---
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="EVEN/ODD TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffers[4], x=8, y=30, w=190, h=160)  # No filename needed!
     
     # Add more pages as needed...
     
@@ -264,7 +278,14 @@ if __name__ == "__main__":
         cumulative_19_to_36:list[int] = []
 
         num_evens:int = 0
+        biggest_even_streak:int = 0
+        current_even_streak:int = 0
+        cumulative_evens:list[int] = []
+
         num_odds:int = 0
+        biggest_odd_streak:int = 0
+        current_odd_streak:int = 0
+        cumulative_odds:list[int] = []
 
         num_red:int = 0
         biggest_red_streak:int = 0
@@ -334,8 +355,18 @@ if __name__ == "__main__":
         # Declare if the result is even or odd (Zero is excluded)
         if((seed_result>0)and(seed_result%2==0)):
             num_evens += 1
+            current_even_streak += 1
+            if(current_odd_streak > biggest_odd_streak):
+                biggest_odd_streak = current_odd_streak
+            current_odd_streak = 0
         elif(seed_result%2==1):
             num_odds += 1
+            current_odd_streak += 1
+            if(current_even_streak > biggest_even_streak):
+                biggest_even_streak = current_even_streak
+            current_even_streak = 0
+        cumulative_evens.append(num_evens)
+        cumulative_odds.append(num_odds)
 
         # Declare which color the result is (Green Zero Excluded)
         if(roulette_numbers_colors[str(seed_result)]=='Black'):
@@ -458,7 +489,7 @@ Actual Number of 1-18: {num_1_to_18:,.0f}
 Theoretical Percent of 1-18: {(18/37)*100:,.2f}%
 Actual Percent of 1-18: {(num_1_to_18/total_games_played)*100:,.2f}%
 Error: {(1-(min([((18/37)*total_games_played),num_1_to_18])/max([((18/37)*total_games_played),num_1_to_18])))*100:,.3f}%
-Largest Streak of 1-18: {biggest_black_streak:,.0f}
+Largest Streak of 1-18: {biggest_1_to_18_streak:,.0f}
 Money Wagered on 1-18: ${one_to_one_bets['1-18']*total_games_played:,.2f}
 Gross Winnings on 1-18: ${one_to_one_bets['1-18']*num_1_to_18*2:,.2f}
 Net Winnings on 1-18: ${abs((one_to_one_bets['1-18']*total_games_played)-(one_to_one_bets['1-18']*num_black*2)):,.2f} {"won" if (one_to_one_bets['1-18']*num_black*2)-(one_to_one_bets['1-18']*total_games_played)>0 else "lost"}
@@ -473,7 +504,25 @@ Money Wagered on 19-36: ${one_to_one_bets['19-36']*total_games_played:,.2f}
 Gross Winnings on 19-36: ${one_to_one_bets['19-36']*num_19_to_36*2:,.2f}
 Net Winnings on 19-36: ${abs((one_to_one_bets['19-36']*total_games_played)-(one_to_one_bets['19-36']*num_red*2)):,.2f} {"won" if (one_to_one_bets['19-36']*num_red*2)-(one_to_one_bets['19-36']*total_games_played)>0 else "lost"}""",
 
-        "even_odd":f"""Number of Even: {num_evens:,.0f}\nNumber of Odds: {num_odds:,.0f}""",
+        "even_odd":f"""Theoretical Number of Even: {((18/37)*total_games_played):,.2f}
+Actual Number of Even: {num_evens:,.0f}
+Theoretical Percent of Even: {(18/37)*100:,.2f}%
+Actual Percent of Even: {(num_evens/total_games_played)*100:,.2f}%
+Error: {(1-(min([((18/37)*total_games_played),num_evens])/max([((18/37)*total_games_played),num_evens])))*100:,.3f}%
+Largest Streak of Even: {biggest_even_streak:,.0f}
+Money Wagered on Even: ${one_to_one_bets['Even']*total_games_played:,.2f}
+Gross Winnings on Even: ${one_to_one_bets['Even']*num_evens*2:,.2f}
+Net Winnings on Even: ${abs((one_to_one_bets['Even']*total_games_played)-(one_to_one_bets['Even']*num_black*2)):,.2f} {"won" if (one_to_one_bets['Even']*num_black*2)-(one_to_one_bets['Even']*total_games_played)>0 else "lost"}
+{'-'*130}
+Theoretical Number of Odd: {((18/37)*total_games_played):,.2f}
+Actual Number of Odd: {num_odds:,.0f}
+Theoretical Percent of Odd: {(18/37)*100:,.2f}%
+Actual Percent of Odd: {(num_odds/total_games_played)*100:,.2f}%
+Error: {(1-(min([((18/37)*total_games_played),num_odds])/max([((18/37)*total_games_played),num_odds])))*100:,.3f}%
+Largest Streak of Odd: {biggest_odd_streak:,.0f}
+Money Wagered on Odd: ${one_to_one_bets['Odd']*total_games_played:,.2f}
+Gross Winnings on Odd: ${one_to_one_bets['Odd']*num_odds*2:,.2f}
+Net Winnings on Odd: ${abs((one_to_one_bets['Odd']*total_games_played)-(one_to_one_bets['Odd']*num_red*2)):,.2f} {"won" if (one_to_one_bets['Odd']*num_red*2)-(one_to_one_bets['Odd']*total_games_played)>0 else "lost"}""",
 
         "dozens":f"""Number of 1-12: {num_1_to_12:,.0f}
 Number of 13-24: {num_13_to_24:,.0f}
@@ -488,6 +537,7 @@ Number of Vertical Column 3: {num_column_3:,.0f}""",
 
     img_buffer_red_black:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_reds,cumulative_blacks,'Reds','Blacks','red','black')
     img_buffer_1_to_18_19_to_36:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_1_to_18,cumulative_19_to_36,'1-18','19-36','blue','orange')
+    img_buffer_even_odd:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_evens,cumulative_odds,'Evens','Odds','purple','green')
 
     if(True): # Cumulative Balance Over Time
         plt.figure(figsize=(10, 6))
@@ -506,4 +556,11 @@ Number of Vertical Column 3: {num_column_3:,.0f}""",
         plt.close()  # Free memory
         img_buffer_balance.seek(0)  # Rewind buffer to start
 
-    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",[img_buffer_red_black,plot_occurrences(single_number_occurrences),img_buffer_balance,img_buffer_1_to_18_19_to_36])
+    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",[
+                img_buffer_red_black,
+                plot_occurrences(single_number_occurrences),
+                img_buffer_balance,
+                img_buffer_1_to_18_19_to_36,
+                img_buffer_even_odd
+            ]
+        )
