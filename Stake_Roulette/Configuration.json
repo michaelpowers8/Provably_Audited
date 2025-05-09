@@ -1,10 +1,10 @@
 {
-	"ServerSeed": "ndjk23lenb3okenbfk2b43jf3kbjr2en23lkjds2",
+	"ServerSeed": "ndjk23lenb3okenbfk2b43jf3kbjr2gn23lkjds2",
 	"ClientSeed": "zpo0983u79r0une239u",
 	"MinimumNonce": 1,
-	"MaximumNonce": 1000000,
+	"MaximumNonce": 1000,
 	"SingleNumberBets": {
-			"0": 250,
+			"0": 0,
 			"1": 0,
 			"2": 0,
 			"3": 0,
@@ -27,14 +27,14 @@
 			"20": 0,
 			"21": 0,
 			"22": 0,
-			"23": 100,
+			"23": 0,
 			"24": 0,
 			"25": 0,
 			"26": 0,
 			"27": 0,
 			"28": 0,
 			"29": 0,
-			"30": 0,
+			"30": 1000,
 			"31": 0,
 			"32": 0,
 			"33": 0,
@@ -56,7 +56,7 @@
 		},
 
 	"DozenBets": {
-			"1-12":600,
+			"1-12":0,
 			"13-24":0,
 			"25-36":0
 		},
@@ -66,7 +66,7 @@
 			"19-36": 0, 
 			"Even": 0, 
 			"Odd": 0, 
-			"Red": 1000, 
+			"Red": 0, 
 			"Black": 0
 		},
 
