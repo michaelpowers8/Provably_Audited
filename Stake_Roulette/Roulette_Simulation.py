@@ -8,7 +8,8 @@ import json
 from pandas import DataFrame
 from fpdf import FPDF,XPos,YPos
 import matplotlib.pyplot as plt
-from PIL import Image,ImageFile
+from matplotlib.container import BarContainer
+from matplotlib.ticker import FuncFormatter
 
 def generate_server_seed():
     possible_characters:str = string.hexdigits
@@ -67,7 +68,7 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> str:
             if(len(row)==1):
                 return row[0]
 
-def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffer:BytesIO):
+def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers:list[BytesIO]):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
     
@@ -91,18 +92,90 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffer:
     pdf.add_page()  # Force new page
     pdf.set_font("Helvetica", size=18, style='B')
     pdf.cell(200, 10, text="RED/BLACK TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.image(img_buffer, x=8, y=30, w=190, h=160)  # No filename needed!
+    pdf.image(img_buffers[0], x=8, y=30, w=190, h=160)  # No filename needed!
+
+    # --- Page 4: Individual Number Frequencies ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="INDIVIDUAL NUMBER FREQUENCY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffers[1], x=8, y=30, w=190)  # No filename needed!
+
+    # --- Page 5: Balance Trend ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.cell(200, 10, text="BALANCE OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffers[2], x=8, y=30, w=190)  # No filename needed!
     
     # --- Page 3: 1-18 / 19-36 Analysis ---
     pdf.add_page()
-    pdf.set_font("Helvetica", size=14, style='B')
+    pdf.set_font("Helvetica", size=18, style='B')
     pdf.cell(200, 10, text="NUMBER RANGE ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.set_font("Helvetica", size=11)
+    pdf.set_font("Helvetica", size=12)
     pdf.multi_cell(0, 10, text=analysis_data["dozens"])
     
     # Add more pages as needed...
     
     pdf.output(filename)
+
+def thousands_formatter(x, pos):
+    return f"{x:,.0f}"
+
+def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
+    """
+    Creates a bar chart from a dictionary of occurrences.
+    
+    Parameters:
+    occurrence_dict (dict): Dictionary with keys 0-36 and integer values
+    """
+    # Validate input
+    if not all(isinstance(k, int) and 0 <= k <= 36 for k in occurrence_dict.keys()):
+        raise ValueError("All keys must be integers between 0 and 36 inclusive")
+    if not all(isinstance(v, int) and v >= 0 for v in occurrence_dict.values()):
+        raise ValueError("All values must be non-negative integers")
+    
+    # Prepare data
+    keys = sorted(occurrence_dict.keys())
+    values = [occurrence_dict[k] for k in keys]
+    colors = list(roulette_numbers_colors.values())
+    
+    # Create figure and axis
+    plt.figure(figsize=(12, 6))
+    
+    # Create bar chart
+    bars:BarContainer = plt.bar(keys, values, color=colors, edgecolor='black')
+    
+    # Customize the plot
+    plt.title('Occurrences of Numbers 0-36', fontsize=16)
+    plt.xlabel('Number', fontsize=14)
+    plt.ylabel('Occurrences', fontsize=14)
+    plt.xticks(keys, rotation=45)
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    # Apply formatter to both axes
+    plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+    
+    # Add value labels - vertical, centered, bold, and formatted
+    for bar in bars:
+        height = bar.get_height()
+        if height > 0:
+            plt.text(bar.get_x() + bar.get_width()/2.,  # x-position: center of bar
+                    height/2,  # y-position: middle of bar height
+                    f'{height:,.0f}',  # Formatted number with thousand separators
+                    ha='center', va='center',  # centered both horizontally and vertically
+                    fontsize=9,
+                    fontweight='bold',  # bold text
+                    rotation='vertical',  # vertical text
+                    color='white')  # text color
+    
+    # Adjust layout to prevent label cutoff
+    # plt.tight_layout()
+    
+    # Save the plot to a bytes buffer (instead of a file)
+    img_buffer:BytesIO = BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
+    plt.close()  # Free memory
+    img_buffer.seek(0)  # Rewind buffer to start
+    return img_buffer
 
 if __name__ == "__main__":
     with open("Configuration.json","rb") as file:
@@ -119,6 +192,8 @@ if __name__ == "__main__":
         dozen_bets:dict[str,float|int] = configuration["DozenBets"]
         one_to_one_bets:dict[str,float|int] = configuration["OnetoOneBets"]
         roulette_numbers_colors:dict[str,str] = configuration["RouletteColors"]
+        balance:float = 1_000_000
+        cumulative_balance:list[float] = []
 
         results:list[list[float|int]] = []
         current_result:list[int] = []
@@ -168,6 +243,9 @@ if __name__ == "__main__":
         cumulative_blacks:list[int] = []
 
         num_single_number_bets_hit:int = 0
+        single_number_occurrences:dict[int,int] = {}
+        for key in range(37):
+            single_number_occurrences[key] = 0
 
         nonces_with_result_0:list[int] = []
 
@@ -176,6 +254,7 @@ if __name__ == "__main__":
         cumulative_games.append(total_games_played)
         current_result = [server,client,nonce]
         seed_result = seeds_to_results(server_seed=server,client_seed=client,nonce=nonce)
+        single_number_occurrences[seed_result] += 1
         
         round_winnings:float = 0
         round_bettings:float = 0
@@ -184,6 +263,7 @@ if __name__ == "__main__":
         round_bettings += sum(list(dozen_bets.values()))
         round_bettings += sum(list(one_to_one_bets.values()))
         total_money_bet += round_bettings
+        balance -= round_bettings
 
         # Declaring which column of the roulette table the result lies (Zero Excluded)
         if(seed_result%3==1):
@@ -284,10 +364,12 @@ if __name__ == "__main__":
             total_number_of_losses += 1
         
         money_won += round_winnings
+        balance += round_winnings
 
-        current_result.extend([seed_result,round_bettings,round_winnings,roulette_numbers_colors[str(seed_result)]])
+        cumulative_balance.append(balance)
+        current_result.extend([seed_result,balance,round_bettings,round_winnings,roulette_numbers_colors[str(seed_result)]])
         results.append(current_result)
-    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_csv(f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Balance","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_csv(f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
     analysis_data:dict[str,int|float|str] = {
         "summary":f"""Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
@@ -342,21 +424,40 @@ Number of Vertical Column 3: {num_column_3:,.0f}""",
         "zeros":f"""Number of 0's: {len(nonces_with_result_0):,.0f}\nNonces Resulting in 0: {"|".join(nonces_with_result_0)}"""
     }
 
-    plt.figure(figsize=(10, 6))
-    plt.plot(cumulative_games, cumulative_reds, label="Reds", color="red", linewidth=2)
-    plt.plot(cumulative_games, cumulative_blacks, label="Blacks", color="black", linewidth=2)
-    plt.xlabel("Total Games Played")
-    plt.ylabel("Cumulative Count")
-    plt.title("Red vs Black Outcomes Over Time")
-    plt.legend()
-    plt.grid(True)
+    if(True): # Red vs Black Analysis
+        plt.figure(figsize=(10, 6))
+        plt.plot(cumulative_games, cumulative_reds, label="Reds", color="red", linewidth=2)
+        plt.plot(cumulative_games, cumulative_blacks, label="Blacks", color="black", linewidth=2)
+        plt.xlabel("Total Games Played")
+        plt.ylabel("Cumulative Count")
+        plt.title("Red vs Black Outcomes Over Time")
+        plt.legend()
+        plt.grid(True)
+        # Apply formatter to both axes
+        plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+        plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
 
-    # Save the plot to a bytes buffer (instead of a file)
-    img_buffer:BytesIO = BytesIO()
-    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
-    plt.close()  # Free memory
-    img_buffer.seek(0)  # Rewind buffer to start
+        # Save the plot to a bytes buffer (instead of a file)
+        img_buffer_red_black:BytesIO = BytesIO()
+        plt.savefig(img_buffer_red_black, format='png', dpi=300, bbox_inches="tight")
+        plt.close()  # Free memory
+        img_buffer_red_black.seek(0)  # Rewind buffer to start
 
-    pil_img:ImageFile = Image.open(img_buffer)
+    if(True): # Cumulative Balance Over Time
+        plt.figure(figsize=(10, 6))
+        plt.plot(cumulative_games, cumulative_balance, label="Balance", color="blue", linewidth=2)
+        plt.xlabel("Total Games Played")
+        plt.ylabel("Cumulative Balance")
+        plt.title("Cumulative Balance Over Time")
+        plt.legend()
+        plt.grid(True)
+        plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+        plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
 
-    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",img_buffer)
+        # Save the plot to a bytes buffer (instead of a file)
+        img_buffer_balance:BytesIO = BytesIO()
+        plt.savefig(img_buffer_balance, format='png', dpi=300, bbox_inches="tight")
+        plt.close()  # Free memory
+        img_buffer_balance.seek(0)  # Rewind buffer to start
+
+    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",[img_buffer_red_black,plot_occurrences(single_number_occurrences),img_buffer_balance])
