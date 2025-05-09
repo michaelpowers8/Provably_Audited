@@ -798,9 +798,9 @@ Theoretical Percent of Vertical Column 3: {(12/37)*100:,.2f}%
 Actual Percent of Vertical Column 3: {(num_column_3/total_games_played)*100:,.2f}%
 Error: {(1-(min([((12/37)*total_games_played),num_column_3])/max([((12/37)*total_games_played),num_column_3])))*100:,.3f}%
 Largest Streak of Vertical Column 3: {biggest_column_3_streak:,.0f}
-Money Wagered on Vertical Column 3: ${vertical_column_bets['3']*total_games_played:,.2f}
-Gross Winnings on Vertical Column 3: ${vertical_column_bets['3']*num_column_3*3:,.2f}
-Net Winnings on Vertical Column 3: ${abs((vertical_column_bets['3']*total_games_played)-(vertical_column_bets['3']*num_column_3*3)):,.2f} {"won" if (vertical_column_bets['3']*num_column_3*3)-(vertical_column_bets['3']*total_games_played)>0 else "lost"}""",
+Money Wagered on Vertical Column 3: ${vertical_column_bets['0']*total_games_played:,.2f}
+Gross Winnings on Vertical Column 3: ${vertical_column_bets['0']*num_column_3*3:,.2f}
+Net Winnings on Vertical Column 3: ${abs((vertical_column_bets['0']*total_games_played)-(vertical_column_bets['0']*num_column_3*3)):,.2f} {"won" if (vertical_column_bets['0']*num_column_3*3)-(vertical_column_bets['0']*total_games_played)>0 else "lost"}""",
 
         "zeros":f"""Theoretical Number of Zeros: {((1/37)*total_games_played):,.2f}
 Actual Number of Zeros: {num_0:,.0f}
