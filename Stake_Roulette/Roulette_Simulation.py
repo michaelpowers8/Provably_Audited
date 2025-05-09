@@ -10,6 +10,7 @@ from fpdf import FPDF,XPos,YPos
 import matplotlib.pyplot as plt
 from matplotlib.container import BarContainer
 from matplotlib.ticker import FuncFormatter
+from numpy import mean,median,quantile
 
 def generate_server_seed():
     possible_characters:str = string.hexdigits
@@ -71,66 +72,113 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int) -> str:
 def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers:list[BytesIO]):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
-    
+
     # --- Page 1: Summary ---
     pdf.add_page()
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="ROULETTE ANALYSIS - SUMMARY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.set_font("Helvetica", size=12)
     for text in analysis_data["summary"].split('\n'):
         pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
-    # --- Page 2: Color Analysis ---
+    # --- Page 2: Winning/Losing Streaks ---
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=24, style='B')
+    pdf.cell(200, 10, text="WINNING/LOSING STREAKS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=14)
+    for line in analysis_data["winning_losing_streaks"].split('\n'):
+        if "Statistical Summary of" in line:
+            # This is a table header
+            pdf.set_font("Helvetica", size=12, style='B')
+            pdf.cell(0, 10, text=line.replace("Statistical Summary of", "").strip(":").strip(), 
+                    border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+            pdf.set_font("Courier", size=10)  # Use monospace for tables
+            
+            # Get the next line which contains the column headers
+            headers = analysis_data["winning_losing_streaks"].split('\n')[analysis_data["winning_losing_streaks"].split('\n').index(line)+1].split('|')
+            # Get the line after that which contains the data
+            data_line = next(iter(analysis_data["winning_losing_streaks"].split('\n')[i+2] for i, l in enumerate(analysis_data["winning_losing_streaks"].split('\n')) if l == line))
+            data = data_line.split('|')
+            
+            # Draw table
+            col_width = 25  # Adjust as needed
+            pdf.set_fill_color(200, 220, 255)
+            
+            # Header row
+            for header in headers:
+                pdf.cell(col_width, 8, header.strip(), border=1, align='C', fill=True)
+            pdf.ln()
+            
+            # Data row
+            for item in data:
+                pdf.cell(col_width, 8, item.strip(), border=1, align='C')
+            pdf.ln()
+            
+            pdf.set_font("Helvetica", size=14)  # Reset font
+        elif("|" in line):
+            pass
+        else:
+            pdf.cell(0, 10, text=line, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    # --- Page 3: Color Analysis ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="RED/BLACK ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font("Helvetica", size=16)
     for text in analysis_data["colors"].split('\n'):
         pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    # --- Page 3: Color Trend ---
+    # --- Page 4: Color Trend ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=18, style='B')
-    pdf.cell(200, 10, text="RED/BLACK TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=24, style='B')
+    pdf.cell(200, 10, text="RED/BLACK/GREEN TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[0], x=8, y=30, w=190, h=160)  # No filename needed!
 
-    # --- Page 4: Individual Number Frequencies ---
+    # --- Page 5: Zero Analysis ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
+    pdf.cell(200, 10, text="ZERO ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=16)
+    for text in analysis_data["zeros"].split('\n'):
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    # --- Page 6: Individual Number Frequencies ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="INDIVIDUAL NUMBER FREQUENCY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[1], x=8, y=30, w=190)  # No filename needed!
 
-    # --- Page 5: Balance Trend ---
+    # --- Page 7: Balance Trend ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="BALANCE OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[2], x=8, y=30, w=190)  # No filename needed!
 
-    # --- Page 6: 1-18 and 19-36 Analysis ---
+    # --- Page 8: 1-18 and 19-36 Analysis ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="1-18 & 19-36 ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font("Helvetica", size=16)
     for text in analysis_data["half_the_numbers"].split('\n'):
         pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
-    # --- Page 7: 1-18 / 19-36 Analysis ---
+    # --- Page 9: 1-18 / 19-36 Analysis ---
     pdf.add_page()
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="1-18 vs 19-36 TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[3], x=8, y=30, w=190, h=160)  # No filename needed!
 
-    # --- Page 8: Even/Odd Analysis ---
+    # --- Page 10: Even/Odd Analysis ---
     pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="EVEN/ODD ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font("Helvetica", size=16)
     for text in analysis_data["even_odd"].split('\n'):
         pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     
-    # --- Page 9: Even/Odd Analysis ---
+    # --- Page 11: Even/Odd Analysis ---
     pdf.add_page()
-    pdf.set_font("Helvetica", size=18, style='B')
+    pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="EVEN/ODD TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[4], x=8, y=30, w=190, h=160)  # No filename needed!
     
@@ -198,10 +246,12 @@ def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
-def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_one_1:list[int],cumulative_one_to_one_2:list[int],label_1:str,label_2:str,color_1:str,color_2:str):
+def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_one_1:list[int],cumulative_one_to_one_2:list[int],label_1:str,label_2:str,color_1:str,color_2:str,cumulative_0=None):
     plt.figure(figsize=(10, 6))
     plt.plot(cumulative_games, cumulative_one_to_one_1, label=label_1, color=color_1, linewidth=2)
     plt.plot(cumulative_games, cumulative_one_to_one_2, label=label_2, color=color_2, linewidth=2)
+    if(cumulative_0):
+        plt.plot(cumulative_games, cumulative_0, label='Zeros', color='green', linewidth=2)
     plt.xlabel("Total Games Played")
     plt.ylabel("Cumulative Count")
     plt.title("Red vs Black Outcomes Over Time")
@@ -245,6 +295,9 @@ if __name__ == "__main__":
         current_winning_streak:int = 0
         current_losing_streak:int = 0
 
+        winning_streaks:list[int] = []
+        losing_streaks:list[int] = []
+
         total_number_of_wins:int = 0
         total_number_of_losses:int = 0
 
@@ -258,6 +311,11 @@ if __name__ == "__main__":
         num_games_with_net_profit:int = 0
         num_games_without_total_loss:int = 0
         num_games_with_total_loss:int = 0
+
+        num_0:int = 0
+        biggest_0_streak:int = 0
+        current_0_streak:int = 0
+        cumulative_0:list[int] = []
 
         num_1_to_12:int = 0
         num_13_to_24:int = 0
@@ -386,7 +444,14 @@ if __name__ == "__main__":
         
         # Checking if result is 0 and adding it to analysis statistics
         if(seed_result==0):
+            num_0 += 1
+            current_0_streak += 1
             nonces_with_result_0.append(f"{nonce:,.0f}")
+        else:
+            if(current_0_streak > biggest_0_streak):
+                biggest_0_streak = current_0_streak
+            current_0_streak = 0
+        cumulative_0.append(num_0)
 
         # Check if a single number bet was placed and won
         round_winnings += single_number_bets[str(seed_result)]*36 # Multiplier is 36 since initial bet is deducted from the balance and then reimbursed. Net gains is still x35 bet size. Same rule applies to all future bets and multipliers below
@@ -429,14 +494,32 @@ if __name__ == "__main__":
         if(round_winnings > round_bettings):
             num_games_with_net_profit += 1
             total_number_of_wins += 1
+            current_winning_streak += 1
+            if(current_losing_streak > biggest_losing_streak[1]):
+                biggest_losing_streak = (nonce-current_losing_streak,current_losing_streak)
+            if(current_losing_streak>0):
+                losing_streaks.append(current_losing_streak)
+            current_losing_streak = 0
         # Check if player lost some money on the table, but not everything
         elif((round_bettings >= round_winnings) and (round_winnings>0)):
             num_games_without_total_loss += 1
             total_number_of_losses += 1
+            current_losing_streak += 1
+            if(current_winning_streak > biggest_winning_streak[1]):
+                biggest_winning_streak = (nonce-current_winning_streak,current_winning_streak)
+            if(current_winning_streak>0):
+                winning_streaks.append(current_winning_streak)
+            current_winning_streak = 0
         # Player did not win any of their bets placed
         else:
+            current_losing_streak += 1
             num_games_with_total_loss += 1
             total_number_of_losses += 1
+            if(current_winning_streak > biggest_winning_streak[1]):
+                biggest_winning_streak = (nonce-current_winning_streak,current_winning_streak)
+            if(current_winning_streak>0):
+                winning_streaks.append(current_winning_streak)
+            current_winning_streak = 0
         
         money_won += round_winnings
         balance += round_winnings
@@ -461,6 +544,22 @@ Theoretical House Edge: 2.70%
 Theoretical Return to Player (RTP): 97.30%
 Actual House Edge: {(1-(money_won/total_money_bet))*100:,.2f}%
 Return to Player (RTP): {(money_won/total_money_bet)*100:,.2f}%""",
+
+        "winning_losing_streaks":f"""Biggest Winning Streak: {biggest_winning_streak[1]:,.0f}
+Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
+Mean Winning Streak: {mean(winning_streaks):,.3f}
+Median Winning Streak: {median(winning_streaks):,.1f}
+Statistical Summary of Winning Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(winning_streaks):,.0f}\t\t|\t\t{quantile(winning_streaks,0.25):,.0f}\t\t|\t\t{median(winning_streaks):,.0f}\t\t|\t\t{quantile(winning_streaks,0.75):,.0f}\t\t|\t\t{quantile(winning_streaks,0.95):,.0f}\t\t|\t\t{quantile(winning_streaks,0.99):,.0f}\t\t|\t\t{max(winning_streaks):,.0f}
+{'-'*120}
+Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
+Starting Nonce of Biggest Losing Streak: {biggest_losing_streak[0]:,.0f}
+Mean Losing Streak: {mean(losing_streaks):,.3f}
+Median Losing Streak: {median(losing_streaks):,.1f}
+Statistical Summary of Losing Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(losing_streaks):,.0f}\t\t|\t\t{quantile(losing_streaks,0.25):,.0f}\t\t|\t\t{median(losing_streaks):,.0f}\t\t|\t\t{quantile(losing_streaks,0.75):,.0f}\t\t|\t\t{quantile(losing_streaks,0.95):,.0f}\t\t|\t\t{quantile(losing_streaks,0.99):,.0f}\t\t|\t\t{max(losing_streaks):,.0f}""",
 
         "single_bets":f"""Number of Single Bets Won: {num_single_number_bets_hit:,.0f}""",
 
@@ -492,7 +591,7 @@ Error: {(1-(min([((18/37)*total_games_played),num_1_to_18])/max([((18/37)*total_
 Largest Streak of 1-18: {biggest_1_to_18_streak:,.0f}
 Money Wagered on 1-18: ${one_to_one_bets['1-18']*total_games_played:,.2f}
 Gross Winnings on 1-18: ${one_to_one_bets['1-18']*num_1_to_18*2:,.2f}
-Net Winnings on 1-18: ${abs((one_to_one_bets['1-18']*total_games_played)-(one_to_one_bets['1-18']*num_black*2)):,.2f} {"won" if (one_to_one_bets['1-18']*num_black*2)-(one_to_one_bets['1-18']*total_games_played)>0 else "lost"}
+Net Winnings on 1-18: ${abs((one_to_one_bets['1-18']*total_games_played)-(one_to_one_bets['1-18']*num_1_to_18*2)):,.2f} {"won" if (one_to_one_bets['1-18']*num_1_to_18*2)-(one_to_one_bets['1-18']*total_games_played)>0 else "lost"}
 {'-'*130}
 Theoretical Number of 19-36: {((18/37)*total_games_played):,.2f}
 Actual Number of 19-36: {num_19_to_36:,.0f}
@@ -502,7 +601,7 @@ Error: {(1-(min([((18/37)*total_games_played),num_19_to_36])/max([((18/37)*total
 Largest Streak of 19-36: {biggest_19_to_36_streak:,.0f}
 Money Wagered on 19-36: ${one_to_one_bets['19-36']*total_games_played:,.2f}
 Gross Winnings on 19-36: ${one_to_one_bets['19-36']*num_19_to_36*2:,.2f}
-Net Winnings on 19-36: ${abs((one_to_one_bets['19-36']*total_games_played)-(one_to_one_bets['19-36']*num_red*2)):,.2f} {"won" if (one_to_one_bets['19-36']*num_red*2)-(one_to_one_bets['19-36']*total_games_played)>0 else "lost"}""",
+Net Winnings on 19-36: ${abs((one_to_one_bets['19-36']*total_games_played)-(one_to_one_bets['19-36']*num_19_to_36*2)):,.2f} {"won" if (one_to_one_bets['19-36']*num_19_to_36*2)-(one_to_one_bets['19-36']*total_games_played)>0 else "lost"}""",
 
         "even_odd":f"""Theoretical Number of Even: {((18/37)*total_games_played):,.2f}
 Actual Number of Even: {num_evens:,.0f}
@@ -512,7 +611,7 @@ Error: {(1-(min([((18/37)*total_games_played),num_evens])/max([((18/37)*total_ga
 Largest Streak of Even: {biggest_even_streak:,.0f}
 Money Wagered on Even: ${one_to_one_bets['Even']*total_games_played:,.2f}
 Gross Winnings on Even: ${one_to_one_bets['Even']*num_evens*2:,.2f}
-Net Winnings on Even: ${abs((one_to_one_bets['Even']*total_games_played)-(one_to_one_bets['Even']*num_black*2)):,.2f} {"won" if (one_to_one_bets['Even']*num_black*2)-(one_to_one_bets['Even']*total_games_played)>0 else "lost"}
+Net Winnings on Even: ${abs((one_to_one_bets['Even']*total_games_played)-(one_to_one_bets['Even']*num_evens*2)):,.2f} {"won" if (one_to_one_bets['Even']*num_evens*2)-(one_to_one_bets['Even']*total_games_played)>0 else "lost"}
 {'-'*130}
 Theoretical Number of Odd: {((18/37)*total_games_played):,.2f}
 Actual Number of Odd: {num_odds:,.0f}
@@ -522,7 +621,7 @@ Error: {(1-(min([((18/37)*total_games_played),num_odds])/max([((18/37)*total_gam
 Largest Streak of Odd: {biggest_odd_streak:,.0f}
 Money Wagered on Odd: ${one_to_one_bets['Odd']*total_games_played:,.2f}
 Gross Winnings on Odd: ${one_to_one_bets['Odd']*num_odds*2:,.2f}
-Net Winnings on Odd: ${abs((one_to_one_bets['Odd']*total_games_played)-(one_to_one_bets['Odd']*num_red*2)):,.2f} {"won" if (one_to_one_bets['Odd']*num_red*2)-(one_to_one_bets['Odd']*total_games_played)>0 else "lost"}""",
+Net Winnings on Odd: ${abs((one_to_one_bets['Odd']*total_games_played)-(one_to_one_bets['Odd']*num_odds*2)):,.2f} {"won" if (one_to_one_bets['Odd']*num_odds*2)-(one_to_one_bets['Odd']*total_games_played)>0 else "lost"}""",
 
         "dozens":f"""Number of 1-12: {num_1_to_12:,.0f}
 Number of 13-24: {num_13_to_24:,.0f}
@@ -532,10 +631,20 @@ Number of 25-36: {num_25_to_36:,.0f}""",
 Number of Vertical Column 2: {num_column_2:,.0f}
 Number of Vertical Column 3: {num_column_3:,.0f}""",
 
-        "zeros":f"""Number of 0's: {len(nonces_with_result_0):,.0f}\nNonces Resulting in 0: {"|".join(nonces_with_result_0)}"""
+        "zeros":f"""Theoretical Number of Zeros: {((1/37)*total_games_played):,.2f}
+Actual Number of Zeros: {num_0:,.0f}
+Theoretical Percent of Zeros: {(1/37)*100:,.2f}%
+Actual Percent of Zeros: {(num_0/total_games_played)*100:,.2f}%
+Error: {(1-(min([((1/37)*total_games_played),num_0])/max([((1/37)*total_games_played),num_0])))*100:,.3f}%
+Largest Streak of Zeros: {biggest_0_streak:,.0f}
+Money Wagered on Zeros: ${single_number_bets['0']*total_games_played:,.2f}
+Gross Winnings on Zeros: ${single_number_bets['0']*num_0*36:,.2f}
+Net Winnings on Zeros: ${abs((single_number_bets['0']*total_games_played)-(single_number_bets['0']*num_0*36)):,.2f} {"won" if (single_number_bets['0']*num_0*36)-(single_number_bets['0']*total_games_played)>0 else "lost"}
+Number of 0's: {len(nonces_with_result_0):,.0f}
+First 10 Nonces Resulting in 0: {"|".join(nonces_with_result_0[:10])}"""
     }
 
-    img_buffer_red_black:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_reds,cumulative_blacks,'Reds','Blacks','red','black')
+    img_buffer_red_black:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_reds,cumulative_blacks,'Reds','Blacks','red','black',cumulative_0)
     img_buffer_1_to_18_19_to_36:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_1_to_18,cumulative_19_to_36,'1-18','19-36','blue','orange')
     img_buffer_even_odd:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_evens,cumulative_odds,'Evens','Odds','purple','green')
 
