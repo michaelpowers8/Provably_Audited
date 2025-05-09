@@ -2,7 +2,7 @@
 	"ServerSeed": "ndjk23lenb3okenbfk2b43jf3kbjr2gn23lkjds2",
 	"ClientSeed": "zpo0983u79r0une239u",
 	"MinimumNonce": 1,
-	"MaximumNonce": 1000,
+	"MaximumNonce": 10000000,
 	"SingleNumberBets": {
 			"0": 0,
 			"1": 0,
