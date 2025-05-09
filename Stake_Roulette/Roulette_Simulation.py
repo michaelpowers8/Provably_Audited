@@ -181,6 +181,34 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="EVEN/ODD TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[4], x=8, y=30, w=190, h=160)  # No filename needed!
+
+    # --- Page 12: Dozens Analysis ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=20, style='B')
+    pdf.cell(200, 10, text="DOZENS ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=12)
+    for text in analysis_data["dozens"].split('\n'):
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    # --- Page 13: Dozens Analysis ---
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=24, style='B')
+    pdf.cell(200, 10, text="DOZENS TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffers[5], x=8, y=30, w=190, h=160)  # No filename needed!
+
+    # --- Page 14: Vertical Columns Analysis ---
+    pdf.add_page()  # Force new page
+    pdf.set_font("Helvetica", size=20, style='B')
+    pdf.cell(200, 10, text="VERTICAL COLUMNS ANALYSIS", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_font("Helvetica", size=12)
+    for text in analysis_data["vertical_columns"].split('\n'):
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    
+    # --- Page 15: Vertical Columns Analysis ---
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=24, style='B')
+    pdf.cell(200, 10, text="VERTICAL COLUMNS TRENDS OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.image(img_buffers[6], x=8, y=30, w=190, h=160)  # No filename needed!
     
     # Add more pages as needed...
     
@@ -268,6 +296,27 @@ def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_on
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
+def plot_dozen_accumulation(cumulative_games:list[int],cumulative_dozen_1:list[int],cumulative_dozen_2:list[int],cumulative_dozen_3:list[int],label_1:str,label_2:str,label_3:str,color_1:str,color_2:str,color_3:str):
+    plt.figure(figsize=(10, 6))
+    plt.plot(cumulative_games, cumulative_dozen_1, label=label_1, color=color_1, linewidth=2)
+    plt.plot(cumulative_games, cumulative_dozen_2, label=label_2, color=color_2, linewidth=2)
+    plt.plot(cumulative_games, cumulative_dozen_3, label=label_3, color=color_3, linewidth=2)
+    plt.xlabel("Total Games Played")
+    plt.ylabel("Cumulative Count")
+    plt.title("Dozen Numbers Outcomes Over Time")
+    plt.legend()
+    plt.grid(True)
+    # Apply formatter to both axes
+    plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+
+    # Save the plot to a bytes buffer (instead of a file)
+    img_buffer:BytesIO = BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
+    plt.close()  # Free memory
+    img_buffer.seek(0)  # Rewind buffer to start
+    return img_buffer
+
 if __name__ == "__main__":
     with open("Configuration.json","rb") as file:
         configuration:dict[str,str|int] = json.load(file)
@@ -318,12 +367,34 @@ if __name__ == "__main__":
         cumulative_0:list[int] = []
 
         num_1_to_12:int = 0
+        biggest_1_to_12_streak:int = 0
+        current_1_to_12_streak:int = 0
+        cumulative_1_to_12:list[int] = []
+
         num_13_to_24:int = 0
+        biggest_13_to_24_streak:int = 0
+        current_13_to_24_streak:int = 0
+        cumulative_13_to_24:list[int] = []
+        
         num_25_to_36:int = 0
+        biggest_25_to_36_streak:int = 0
+        current_25_to_36_streak:int = 0
+        cumulative_25_to_36:list[int] = []
 
         num_column_1:int = 0
+        biggest_column_1_streak:int = 0
+        current_column_1_streak:int = 0
+        cumulative_column_1:list[int] = []
+
         num_column_2:int = 0
+        biggest_column_2_streak:int = 0
+        current_column_2_streak:int = 0
+        cumulative_column_2:list[int] = []
+
         num_column_3:int = 0
+        biggest_column_3_streak:int = 0
+        current_column_3_streak:int = 0
+        cumulative_column_3:list[int] = []
 
         num_1_to_18:int = 0
         biggest_1_to_18_streak:int = 0
@@ -381,18 +452,66 @@ if __name__ == "__main__":
         # Declaring which column of the roulette table the result lies (Zero Excluded)
         if(seed_result%3==1):
             num_column_1 += 1
+            current_column_1_streak += 1
+            if(current_column_2_streak > biggest_column_2_streak):
+                biggest_column_2_streak = current_column_2_streak
+            current_column_2_streak = 0
+            if(current_column_3_streak > biggest_column_3_streak):
+                biggest_column_3_streak = current_column_3_streak
+            current_column_3_streak = 0
         elif(seed_result%3==2):
             num_column_2 += 1
+            current_column_2_streak += 1
+            if(current_column_1_streak > biggest_column_1_streak):
+                biggest_column_1_streak = current_column_1_streak
+            current_column_1_streak = 0
+            if(current_column_3_streak > biggest_column_3_streak):
+                biggest_column_3_streak = current_column_3_streak
+            current_column_3_streak = 0
         elif((seed_result%3==0)and(seed_result>0)):
             num_column_3 += 1
+            current_column_3_streak += 1
+            if(current_column_2_streak > biggest_column_2_streak):
+                biggest_column_2_streak = current_column_2_streak
+            current_column_2_streak = 0
+            if(current_column_1_streak > biggest_column_1_streak):
+                biggest_column_1_streak = current_column_1_streak
+            current_column_1_streak = 0
+        cumulative_column_1.append(num_column_1)
+        cumulative_column_2.append(num_column_2)
+        cumulative_column_3.append(num_column_3)
 
         # Declare which dozen the result lies (Zero Excluded)
         if(seed_result>=1 and seed_result<=12):
             num_1_to_12 += 1
+            current_1_to_12_streak += 1
+            if(current_13_to_24_streak > biggest_13_to_24_streak):
+                biggest_13_to_24_streak = current_13_to_24_streak
+            current_13_to_24_streak = 0
+            if(current_25_to_36_streak > biggest_25_to_36_streak):
+                biggest_25_to_36_streak = current_25_to_36_streak
+            current_25_to_36_streak = 0
         elif(seed_result>=13 and seed_result<=24):
             num_13_to_24 += 1
+            current_13_to_24_streak += 1
+            if(current_1_to_12_streak > biggest_1_to_12_streak):
+                biggest_1_to_12_streak = current_1_to_12_streak
+            current_1_to_12_streak = 0
+            if(current_25_to_36_streak > biggest_25_to_36_streak):
+                biggest_25_to_36_streak = current_25_to_36_streak
+            current_25_to_36_streak = 0
         elif(seed_result>=25 and seed_result<=36):
             num_25_to_36 += 1
+            current_25_to_36_streak += 1
+            if(current_13_to_24_streak > biggest_13_to_24_streak):
+                biggest_13_to_24_streak = current_13_to_24_streak
+            current_13_to_24_streak = 0
+            if(current_1_to_12_streak > biggest_1_to_12_streak):
+                biggest_1_to_12_streak = current_1_to_12_streak
+            current_1_to_12_streak = 0
+        cumulative_1_to_12.append(num_1_to_12)
+        cumulative_13_to_24.append(num_13_to_24)
+        cumulative_25_to_36.append(num_25_to_36)
 
         # Declare which half of numbers the result lies (Zero excluded)
         if(seed_result>=1 and seed_result<=18):
@@ -623,13 +742,65 @@ Money Wagered on Odd: ${one_to_one_bets['Odd']*total_games_played:,.2f}
 Gross Winnings on Odd: ${one_to_one_bets['Odd']*num_odds*2:,.2f}
 Net Winnings on Odd: ${abs((one_to_one_bets['Odd']*total_games_played)-(one_to_one_bets['Odd']*num_odds*2)):,.2f} {"won" if (one_to_one_bets['Odd']*num_odds*2)-(one_to_one_bets['Odd']*total_games_played)>0 else "lost"}""",
 
-        "dozens":f"""Number of 1-12: {num_1_to_12:,.0f}
-Number of 13-24: {num_13_to_24:,.0f}
-Number of 25-36: {num_25_to_36:,.0f}""",
+        "dozens":f"""Theoretical Number of 1-12: {((12/37)*total_games_played):,.2f}
+Actual Number of 1-12: {num_1_to_12:,.0f}
+Theoretical Percent of 1-12: {(12/37)*100:,.2f}%
+Actual Percent of 1-12: {(num_1_to_12/total_games_played)*100:,.2f}%
+Error: {(1-(min([((12/37)*total_games_played),num_1_to_12])/max([((12/37)*total_games_played),num_1_to_12])))*100:,.3f}%
+Largest Streak of 1-12: {biggest_1_to_12_streak:,.0f}
+Money Wagered on 1-12: ${dozen_bets['1-12']*total_games_played:,.2f}
+Gross Winnings on 1-12: ${dozen_bets['1-12']*num_1_to_12*3:,.2f}
+Net Winnings on 1-12: ${abs((dozen_bets['1-12']*total_games_played)-(dozen_bets['1-12']*num_1_to_12*3)):,.2f} {"won" if (dozen_bets['1-12']*num_1_to_12*3)-(dozen_bets['1-12']*total_games_played)>0 else "lost"}
+{'-'*120}
+Theoretical Number of 13-24: {((12/37)*total_games_played):,.2f}
+Actual Number of 13-24: {num_13_to_24:,.0f}
+Theoretical Percent of 13-24: {(12/37)*100:,.2f}%
+Actual Percent of 13-24: {(num_13_to_24/total_games_played)*100:,.2f}%
+Error: {(1-(min([((12/37)*total_games_played),num_13_to_24])/max([((12/37)*total_games_played),num_13_to_24])))*100:,.3f}%
+Largest Streak of 13-24: {biggest_13_to_24_streak:,.0f}
+Money Wagered on 13-24: ${dozen_bets['13-24']*total_games_played:,.2f}
+Gross Winnings on 13-24: ${dozen_bets['13-24']*num_13_to_24*3:,.2f}
+Net Winnings on 13-24: ${abs((dozen_bets['13-24']*total_games_played)-(dozen_bets['13-24']*num_13_to_24*3)):,.2f} {"won" if (dozen_bets['13-24']*num_13_to_24*3)-(dozen_bets['13-24']*total_games_played)>0 else "lost"}
+{'-'*120}
+Theoretical Number of 25-36: {((12/37)*total_games_played):,.2f}
+Actual Number of 25-36: {num_25_to_36:,.0f}
+Theoretical Percent of 25-36: {(12/37)*100:,.2f}%
+Actual Percent of 25-36: {(num_25_to_36/total_games_played)*100:,.2f}%
+Error: {(1-(min([((12/37)*total_games_played),num_25_to_36])/max([((12/37)*total_games_played),num_25_to_36])))*100:,.3f}%
+Largest Streak of 25-36: {biggest_25_to_36_streak:,.0f}
+Money Wagered on 25-36: ${dozen_bets['25-36']*total_games_played:,.2f}
+Gross Winnings on 25-36: ${dozen_bets['25-36']*num_25_to_36*3:,.2f}
+Net Winnings on 25-36: ${abs((dozen_bets['25-36']*total_games_played)-(dozen_bets['25-36']*num_25_to_36*3)):,.2f} {"won" if (dozen_bets['25-36']*num_25_to_36*3)-(dozen_bets['25-36']*total_games_played)>0 else "lost"}""",
 
-        "vertical_columns":f"""Number of Vertical Column 1: {num_column_1:,.0f}
-Number of Vertical Column 2: {num_column_2:,.0f}
-Number of Vertical Column 3: {num_column_3:,.0f}""",
+        "vertical_columns":f"""Theoretical Number of Vertical Column 1: {((12/37)*total_games_played):,.2f}
+Actual Number of Vertical Column 1: {num_column_1:,.0f}
+Theoretical Percent of Vertical Column 1: {(12/37)*100:,.2f}%
+Actual Percent of Vertical Column 1: {(num_column_1/total_games_played)*100:,.2f}%
+Error: {(1-(min([((12/37)*total_games_played),num_column_1])/max([((12/37)*total_games_played),num_column_1])))*100:,.3f}%
+Largest Streak of Vertical Column 1: {biggest_column_1_streak:,.0f}
+Money Wagered on Vertical Column 1: ${vertical_column_bets['1']*total_games_played:,.2f}
+Gross Winnings on Vertical Column 1: ${vertical_column_bets['1']*num_column_1*3:,.2f}
+Net Winnings on Vertical Column 1: ${abs((vertical_column_bets['1']*total_games_played)-(vertical_column_bets['1']*num_column_1*3)):,.2f} {"won" if (vertical_column_bets['1']*num_column_1*3)-(vertical_column_bets['1']*total_games_played)>0 else "lost"}
+{'-'*120}
+Theoretical Number of Vertical Column 2: {((12/37)*total_games_played):,.2f}
+Actual Number of Vertical Column 2: {num_column_2:,.0f}
+Theoretical Percent of Vertical Column 2: {(12/37)*100:,.2f}%
+Actual Percent of Vertical Column 2: {(num_column_2/total_games_played)*100:,.2f}%
+Error: {(1-(min([((12/37)*total_games_played),num_column_2])/max([((12/37)*total_games_played),num_column_2])))*100:,.3f}%
+Largest Streak of Vertical Column 2: {biggest_column_2_streak:,.0f}
+Money Wagered on Vertical Column 2: ${vertical_column_bets['2']*total_games_played:,.2f}
+Gross Winnings on Vertical Column 2: ${vertical_column_bets['2']*num_column_2*3:,.2f}
+Net Winnings on Vertical Column 2: ${abs((vertical_column_bets['2']*total_games_played)-(vertical_column_bets['2']*num_column_2*3)):,.2f} {"won" if (vertical_column_bets['2']*num_column_2*3)-(vertical_column_bets['2']*total_games_played)>0 else "lost"}
+{'-'*120}
+Theoretical Number of Vertical Column 3: {((12/37)*total_games_played):,.2f}
+Actual Number of Vertical Column 3: {num_column_3:,.0f}
+Theoretical Percent of Vertical Column 3: {(12/37)*100:,.2f}%
+Actual Percent of Vertical Column 3: {(num_column_3/total_games_played)*100:,.2f}%
+Error: {(1-(min([((12/37)*total_games_played),num_column_3])/max([((12/37)*total_games_played),num_column_3])))*100:,.3f}%
+Largest Streak of Vertical Column 3: {biggest_column_3_streak:,.0f}
+Money Wagered on Vertical Column 3: ${vertical_column_bets['3']*total_games_played:,.2f}
+Gross Winnings on Vertical Column 3: ${vertical_column_bets['3']*num_column_3*3:,.2f}
+Net Winnings on Vertical Column 3: ${abs((vertical_column_bets['3']*total_games_played)-(vertical_column_bets['3']*num_column_3*3)):,.2f} {"won" if (vertical_column_bets['3']*num_column_3*3)-(vertical_column_bets['3']*total_games_played)>0 else "lost"}""",
 
         "zeros":f"""Theoretical Number of Zeros: {((1/37)*total_games_played):,.2f}
 Actual Number of Zeros: {num_0:,.0f}
@@ -647,7 +818,8 @@ First 10 Nonces Resulting in 0: {"|".join(nonces_with_result_0[:10])}"""
     img_buffer_red_black:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_reds,cumulative_blacks,'Reds','Blacks','red','black',cumulative_0)
     img_buffer_1_to_18_19_to_36:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_1_to_18,cumulative_19_to_36,'1-18','19-36','blue','orange')
     img_buffer_even_odd:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_evens,cumulative_odds,'Evens','Odds','purple','green')
-
+    img_buffer_1_to_12_13_to_24_25_to_36:BytesIO = plot_dozen_accumulation(cumulative_games,cumulative_1_to_12,cumulative_13_to_24,cumulative_25_to_36,'1-12','13-24','25-36','red','blue','black')
+    img_buffer_vertical_columns:BytesIO = plot_dozen_accumulation(cumulative_games,cumulative_column_1,cumulative_column_2,cumulative_column_3,'Column 1','Column 2','Column 3','pink','blue','green')
     if(True): # Cumulative Balance Over Time
         plt.figure(figsize=(10, 6))
         plt.plot(cumulative_games, cumulative_balance, label="Balance", color="blue", linewidth=2)
@@ -670,6 +842,8 @@ First 10 Nonces Resulting in 0: {"|".join(nonces_with_result_0[:10])}"""
                 plot_occurrences(single_number_occurrences),
                 img_buffer_balance,
                 img_buffer_1_to_18_19_to_36,
-                img_buffer_even_odd
+                img_buffer_even_odd,
+                img_buffer_1_to_12_13_to_24_25_to_36,
+                img_buffer_vertical_columns
             ]
         )
