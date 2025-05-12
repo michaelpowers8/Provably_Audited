@@ -288,7 +288,7 @@ if __name__ == "__main__":
         total_games_played += 1
         cumulative_games.append(total_games_played)
         total_money_bet += bet_size
-        current_result = [server,client,nonce]
+        current_result = [server,server_hashed,client,nonce]
         seed_result = seeds_to_results(server_seed=server,client_seed=client,nonce=nonce)
         for key,item in milestone_multiplier.items():
             if(seed_result>key):
@@ -315,7 +315,10 @@ if __name__ == "__main__":
             current_result.extend([target_multiplier,round(seed_result,2),"YES",bet_size,round(bet_size*target_multiplier,2),round(total_money_bet,2),round(money_won,2)])
         results.append(current_result)
         cumulative_profit.append(money_won-total_money_bet)
-    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"]).to_csv(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    df:DataFrame = DataFrame(results,columns=["Server Seed","Server Seed (Hashed)","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"])
+    df.to_csv(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    df.to_json(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json",orient='records',indent=4)
+    del df
     analysis_data:dict[str,int|float|str] = {
         "summary":f"""Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
