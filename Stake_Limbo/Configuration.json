@@ -2,7 +2,7 @@
 	"ServerSeed": "fa18081cb423696c8ad04b12efc0154ecc746857c2105f7d82d342d7df1c70d5",
 	"ClientSeed": "k2lOa3xGLY",
 	"MinimumNonce": 1,
-	"MaximumNonce": 1000000,
+	"MaximumNonce": 100000,
 	"TargetMultiplier": 3,
 	"BetSize": 2.23
 }
