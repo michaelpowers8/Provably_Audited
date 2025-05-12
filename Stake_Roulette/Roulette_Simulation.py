@@ -274,7 +274,7 @@ def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
-def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_one_1:list[int],cumulative_one_to_one_2:list[int],label_1:str,label_2:str,color_1:str,color_2:str,cumulative_0=None):
+def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_one_1:list[int],cumulative_one_to_one_2:list[int],label_1:str,label_2:str,color_1:str,color_2:str,cumulative_0=None,title='Red vs Black Over Time'):
     plt.figure(figsize=(10, 6))
     plt.plot(cumulative_games, cumulative_one_to_one_1, label=label_1, color=color_1, linewidth=2)
     plt.plot(cumulative_games, cumulative_one_to_one_2, label=label_2, color=color_2, linewidth=2)
@@ -282,7 +282,7 @@ def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_on
         plt.plot(cumulative_games, cumulative_0, label='Zeros', color='green', linewidth=2)
     plt.xlabel("Total Games Played")
     plt.ylabel("Cumulative Count")
-    plt.title("Red vs Black Outcomes Over Time")
+    plt.title(title)
     plt.legend()
     plt.grid(True)
     # Apply formatter to both axes
@@ -296,14 +296,14 @@ def plot_one_to_one_accumulation(cumulative_games:list[int],cumulative_one_to_on
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
-def plot_dozen_accumulation(cumulative_games:list[int],cumulative_dozen_1:list[int],cumulative_dozen_2:list[int],cumulative_dozen_3:list[int],label_1:str,label_2:str,label_3:str,color_1:str,color_2:str,color_3:str):
+def plot_dozen_accumulation(cumulative_games:list[int],cumulative_dozen_1:list[int],cumulative_dozen_2:list[int],cumulative_dozen_3:list[int],label_1:str,label_2:str,label_3:str,color_1:str,color_2:str,color_3:str,title='Dozen Number Outcomes Over Time'):
     plt.figure(figsize=(10, 6))
     plt.plot(cumulative_games, cumulative_dozen_1, label=label_1, color=color_1, linewidth=2)
     plt.plot(cumulative_games, cumulative_dozen_2, label=label_2, color=color_2, linewidth=2)
     plt.plot(cumulative_games, cumulative_dozen_3, label=label_3, color=color_3, linewidth=2)
     plt.xlabel("Total Games Played")
     plt.ylabel("Cumulative Count")
-    plt.title("Dozen Numbers Outcomes Over Time")
+    plt.title(title)
     plt.legend()
     plt.grid(True)
     # Apply formatter to both axes
@@ -816,10 +816,10 @@ First 10 Nonces Resulting in 0: {"|".join(nonces_with_result_0[:10])}"""
     }
 
     img_buffer_red_black:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_reds,cumulative_blacks,'Reds','Blacks','red','black',cumulative_0)
-    img_buffer_1_to_18_19_to_36:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_1_to_18,cumulative_19_to_36,'1-18','19-36','blue','orange')
-    img_buffer_even_odd:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_evens,cumulative_odds,'Evens','Odds','purple','green')
+    img_buffer_1_to_18_19_to_36:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_1_to_18,cumulative_19_to_36,'1-18','19-36','blue','orange',title='1-18 vs 19-36 Outcomes Over Time')
+    img_buffer_even_odd:BytesIO = plot_one_to_one_accumulation(cumulative_games,cumulative_evens,cumulative_odds,'Evens','Odds','purple','green', title='Even vs Odd Outcomes Over Time')
     img_buffer_1_to_12_13_to_24_25_to_36:BytesIO = plot_dozen_accumulation(cumulative_games,cumulative_1_to_12,cumulative_13_to_24,cumulative_25_to_36,'1-12','13-24','25-36','red','blue','black')
-    img_buffer_vertical_columns:BytesIO = plot_dozen_accumulation(cumulative_games,cumulative_column_1,cumulative_column_2,cumulative_column_3,'Column 1','Column 2','Column 3','pink','blue','green')
+    img_buffer_vertical_columns:BytesIO = plot_dozen_accumulation(cumulative_games,cumulative_column_1,cumulative_column_2,cumulative_column_3,'Column 1','Column 2','Column 3','pink','blue','green',title='Vertical Outcomes Over Time')
     if(True): # Cumulative Balance Over Time
         plt.figure(figsize=(10, 6))
         plt.plot(cumulative_games, cumulative_balance, label="Balance", color="blue", linewidth=2)
