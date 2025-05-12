@@ -166,3 +166,4 @@ cython_debug/
 *.eml
 *.xml
 *.pdf
+*_RESULTS*.json
