@@ -302,7 +302,7 @@ if __name__ == "__main__":
             current_winning_streak = 0
             current_losing_streak += 1
             total_number_of_losses +=1
-            current_result.extend([seed_result,"NO"])
+            current_result.extend([target_multiplier,seed_result,"NO",bet_size,0,round(total_money_bet,2),round(money_won,2)])
         else:
             if(current_losing_streak > biggest_losing_streak[1]):
                 biggest_losing_streak = (nonce-current_losing_streak,current_losing_streak)
@@ -312,10 +312,10 @@ if __name__ == "__main__":
             current_winning_streak += 1
             total_number_of_wins += 1
             money_won += (bet_size*target_multiplier)
-            current_result.extend([seed_result,"YES"])
+            current_result.extend([target_multiplier,round(seed_result,2),"YES",bet_size,round(bet_size*target_multiplier,2),round(total_money_bet,2),round(money_won,2)])
         results.append(current_result)
         cumulative_profit.append(money_won-total_money_bet)
-    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Win"]).to_csv(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"]).to_csv(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
     analysis_data:dict[str,int|float|str] = {
         "summary":f"""Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
