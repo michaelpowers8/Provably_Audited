@@ -131,7 +131,7 @@ def plot_accumulation(cumulative_games:list[int],cumulative_item_1:list[int],lab
     # Plot the max point as a red dot
     plt.scatter(cumulative_games[cumulative_item_1.index(max(cumulative_item_1))], max(cumulative_item_1), color='black', s=50, label=f'Max: ({cumulative_games[cumulative_item_1.index(max(cumulative_item_1))]:,.0f}, ${max(cumulative_item_1):,.2f})',zorder=2)
     plt.scatter(cumulative_games[cumulative_item_1.index(min(cumulative_item_1))], min(cumulative_item_1), color='blue', s=50, label=f'Min: ({cumulative_games[cumulative_item_1.index(min(cumulative_item_1))]:,.0f}, ${min(cumulative_item_1):,.2f})',zorder=3)
-    plt.plot(cumulative_games, cumulative_item_1, label=label_1, color=color_1, linewidth=2, zorder=1)
+    plt.plot(cumulative_games, cumulative_item_1, label=label_1, color=color_1, linewidth=1, zorder=1)
     plt.xlabel("Total Games Played")
     plt.ylabel(ylabel)
     plt.title(title)
@@ -156,6 +156,7 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.add_page()
     pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="LIMBO ANALYSIS - SUMMARY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_xy(10,30)
     pdf.set_font("Helvetica", size=12)
     for text in analysis_data["summary"].split('\n'):
         pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
@@ -165,6 +166,16 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.set_font("Helvetica", size=24, style='B')
     pdf.cell(200, 10, text="MILESTONE MULTIPLIER FREQUENCY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
     pdf.image(img_buffers[0], x=8, y=30, w=190)  # No filename needed!
+    pdf.set_xy(12,150)
+    pdf.set_font("Helvetica", size=12)
+    pdf.multi_cell(
+            w=190,
+            h=10,
+            text="""HOW TO READ THIS CHART:
+This chart shows the frequency of various milestone multipliers commonly bet on in Limbo. The numbers inside the bars represent how many multipliers were equal to the target below, or larger. For example, if the bar above 1,000,000 had a 5 in it, that means there were 5 instances where the resulting multiplier was 1,000,000 or larger. If the bar above the multiplier 500 has the number 350 in it, that means there were 350 instances where the resulting multiplier was at least 500 AND smaller than 1,000.""",
+            border=0,
+            align='L'
+        )
 
     # --- Page 3: Winning/Losing Streaks ---
     pdf.add_page()
@@ -311,14 +322,18 @@ Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
 Target Multiplier: {target_multiplier:,.2f}x
+{'-'*130}
 Total Games Played: {total_games_played:,.0f}
 Theoretical Number of Wins: {(total_games_played/target_multiplier)*0.99:,.2f}
 Actual Number of Wins: {total_number_of_wins:,.0f}
+{'-'*130}
 Theoretical Number of Losses: {total_games_played - ((total_games_played/target_multiplier)*0.99):,.2f}
 Actual Number of Losses: {total_number_of_losses:,.0f}
+{'-'*130}
 Total Money Wagered: ${total_money_bet:,.2f}
 Gross Winnings: ${money_won:,.2f}
 Net Winnings: ${abs(total_money_bet-money_won):,.2f} {"won" if money_won-total_money_bet>0 else "lost"}
+{'-'*130}
 Theoretical House Edge: 1.00%
 Theoretical Return to Player (RTP): 99.00%
 Actual House Edge: {(1-(money_won/total_money_bet))*100:,.2f}%
