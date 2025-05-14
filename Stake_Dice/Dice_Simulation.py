@@ -2,10 +2,15 @@ import hmac
 import hashlib
 import random
 import string
+from io import BytesIO
 from math import floor
-from numpy import mean,median,quantile
 import json
 from pandas import DataFrame
+from fpdf import FPDF,XPos,YPos
+import matplotlib.pyplot as plt
+from matplotlib.container import BarContainer
+from matplotlib.ticker import FuncFormatter
+from numpy import mean,median,quantile
 from Mulitpliers import dice_multipliers
 
 def generate_server_seed():
@@ -80,52 +85,138 @@ def confirm_threshold_with_win_chance(over_under:str, threshold:float, win_chanc
     
     return False
 
+def thousands_formatter(x, pos):
+    return f"{x:,.0f}"
+
+def thousands_formatter_with_dollar_signs(x, pos):
+    return f"${x:,.0f}"
+
+def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
+    """
+    Creates a bar chart from a dictionary of occurrences.
+    
+    Parameters:
+    occurrence_dict (dict): Dictionary with keys 0-36 and integer values
+    """
+    
+    # Prepare data
+    keys = list(occurrence_dict.keys())
+    values = [occurrence_dict[k] for k in keys]
+    colors = ["red" if index%2==0 else "blue" for index in range(len(keys))]
+    bar_heights:list[float|int] = [(x+2)**1.12 for x in range(len(values))]
+    
+    # Create figure and axis
+    plt.figure(figsize=(12, 6))
+    
+    # Create bar chart
+    bars:BarContainer = plt.bar(range(len(keys)), bar_heights, width=0.6, color=colors, edgecolor='black')
+    
+    # Customize the plot
+    plt.title('Occurrences of Milestone Multipliers', fontsize=16)
+    plt.xlabel('Multiplier', fontsize=14)
+    plt.ylabel('Occurrences', fontsize=14)
+    plt.xticks(ticks=range(len(keys)), labels=[f"{key:,}" for key in keys], rotation=90)
+    plt.yticks(ticks=[max(bar_heights)*0.2,max(bar_heights)*0.4,max(bar_heights)*0.6,max(bar_heights)*0.8,max(bar_heights)],labels=[f"{quantile(values,0.2):,.0f}",f"{quantile(values,0.4):,.0f}",f"{quantile(values,0.6):,.0f}",f"{quantile(values,0.8):,.0f}",f"{max(values):,.0f}"])
+    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    
+    # Add value labels - vertical, centered, bold, and formatted
+    for bar in bars:
+        height = bar.get_height()
+        if height > 0:
+            plt.text(bar.get_x() + bar.get_width()/2.,  # x-position: center of bar
+                    height/2,  # y-position: middle of bar height
+                    f'{values[bars.index(bar)]:,.0f}',  # Formatted number with thousand separators
+                    ha='center', va='center',  # centered both horizontally and vertically
+                    fontsize=12,
+                    fontweight='bold',  # bold text
+                    rotation='vertical',  # vertical text
+                    color='white')  # text color
+    
+    # Adjust layout to prevent label cutoff
+    # plt.tight_layout()
+    
+    # Save the plot to a bytes buffer (instead of a file)
+    img_buffer:BytesIO = BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
+    plt.close()  # Free memory
+    img_buffer.seek(0)  # Rewind buffer to start
+    return img_buffer
+
+def plot_accumulation(cumulative_games:list[int],cumulative_item_1:list[int],label_1:str,color_1:str,title:str,ylabel:str):
+    plt.figure(figsize=(10, 6))
+    # Plot the max point as a red dot
+    plt.scatter(cumulative_games[cumulative_item_1.index(max(cumulative_item_1))], max(cumulative_item_1), color='black', s=50, label=f'Max: ({cumulative_games[cumulative_item_1.index(max(cumulative_item_1))]:,.0f}, ${max(cumulative_item_1):,.2f})',zorder=2)
+    plt.scatter(cumulative_games[cumulative_item_1.index(min(cumulative_item_1))], min(cumulative_item_1), color='blue', s=50, label=f'Min: ({cumulative_games[cumulative_item_1.index(min(cumulative_item_1))]:,.0f}, ${min(cumulative_item_1):,.2f})',zorder=3)
+    plt.plot(cumulative_games, cumulative_item_1, label=label_1, color=color_1, linewidth=1, zorder=1)
+    plt.xlabel("Total Games Played")
+    plt.ylabel(ylabel)
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    # Apply formatter to both axes
+    plt.gca().xaxis.set_major_formatter(FuncFormatter(thousands_formatter))
+    plt.gca().yaxis.set_major_formatter(FuncFormatter(thousands_formatter_with_dollar_signs))
+
+    # Save the plot to a bytes buffer (instead of a file)
+    img_buffer:BytesIO = BytesIO()
+    plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
+    plt.close()  # Free memory
+    img_buffer.seek(0)  # Rewind buffer to start
+    return img_buffer
+
+def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers:list[BytesIO]):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
+
+    # --- Page 1: Summary ---
+    pdf.add_page()
+    pdf.set_font("Helvetica", size=24, style='B')
+    pdf.cell(200, 10, text="DICE ANALYSIS - SUMMARY", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
+    pdf.set_xy(10,30)
+    pdf.set_font("Helvetica", size=12)
+    for text in analysis_data["summary"].split('\n'):
+        pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+
+    pdf.output(filename)
+
 if __name__ == "__main__":
     with open("Configuration.json","rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
-    server:str = generate_server_seed()#configuration["ServerSeed"]
-    server_hashed:str = sha256_encrypt(server)
-    client:str = generate_client_seed()#configuration["ClientSeed"]
-    nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
-    over_under:str = configuration["OverUnder"]
-    threshold:float = round(configuration["Threshold"],2)
-    win_chance:float = round(configuration["WinChance"],2)
-    bet_size:float = configuration["BetSize"]
-    largest_bet_size:float = bet_size
+    if(True):
+        server:str = generate_server_seed()#configuration["ServerSeed"]
+        server_hashed:str = sha256_encrypt(server)
+        client:str = generate_client_seed()#configuration["ClientSeed"]
+        nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
+        over_under:str = configuration["OverUnder"]
+        threshold:float = round(configuration["Threshold"],2)
+        bet_size:float = configuration["BetSize"]
+        largest_bet_size:float = bet_size
 
-    if(confirm_threshold_with_win_chance(over_under=over_under, threshold=threshold, win_chance=win_chance)):
-        pass
-    else:
-        if(over_under == "Over"):
-            threshold = 100-win_chance
-        else:
-            threshold = win_chance
+        results:list[list[float|int]] = []
+        current_result:list[int] = []
 
-    results:list[list[float|int]] = []
-    current_result:list[int] = []
+        biggest_winning_streak:tuple[int,int] = (0,0)
+        biggest_losing_streak:tuple[int,int] = (0,0)
 
-    biggest_winning_streak:tuple[int,int] = (0,0)
-    biggest_losing_streak:tuple[int,int] = (0,0)
+        current_winning_streak:int = 0
+        current_losing_streak:int = 0
+        losing_streak_sizes:list[int] = []
 
-    current_winning_streak:int = 0
-    current_losing_streak:int = 0
-    losing_streak_sizes:list[int] = []
+        total_number_of_wins:int = 0
+        total_number_of_losses:int = 0
+        total_games_played:int = 0
 
-    total_number_of_wins:int = 0
-    total_number_of_losses:int = 0
-    total_games_played:int = 0
+        balance:float = 10000
+        starting_balance:float = balance
+        biggest_balance:float = balance
 
-    balance:float = 10000
-    starting_balance:float = balance
-    biggest_balance:float = balance
+        money_spent_over_current_losing_streak:float = 0
+        most_money_spent_over_current_losing_streak:float = 0
 
-    money_spent_over_current_losing_streak:float = 0
-    most_money_spent_over_current_losing_streak:float = 0
-
-    money_won:float = 0
-    money_bet:float = 0
-    nonces_with_perfect_rolls:list[int] = []
+        money_won:float = 0
+        money_bet:float = 0
+        nonces_with_perfect_rolls:list[int] = []
 
     for nonce in nonces:
         total_games_played += 1
@@ -183,6 +274,31 @@ if __name__ == "__main__":
             nonces_with_perfect_rolls.append(f"{nonce:,.0f}")
         results.append(current_result)
     DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Win"]).to_csv(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    
+    analysis_data:dict[str,int|float|str] = {
+        "summary":f"""Server Seed: {server}
+Server Seed (Hashed): {server_hashed}
+Client Seed: {client}
+Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
+Threshold: {over_under.capitalize()} {threshold:,.2f}
+{'-'*130}
+Total Games Played: {total_games_played:,.0f}
+Theoretical Number of Wins: {(total_games_played*(threshold/100)) if over_under=="Under" else (total_games_played*((100-threshold)/100)):,.2f}
+Actual Number of Wins: {total_number_of_wins:,.0f}
+{'-'*130}
+Theoretical Number of Losses: {total_games_played - ((total_games_played*((100-threshold)/100))) if over_under=="Under" else (total_games_played*((threshold)/100)):,.2f}
+Actual Number of Losses: {total_number_of_losses:,.0f}
+{'-'*130}
+Total Money Wagered: ${money_bet:,.2f}
+Gross Winnings: ${money_won:,.2f}
+Net Winnings: ${abs(money_bet-money_won):,.2f} {"won" if money_won-money_bet>0 else "lost"}
+{'-'*130}
+Theoretical House Edge: 1.00%
+Theoretical Return to Player (RTP): 99.00%
+Actual House Edge: {(1-(money_won/money_bet))*100:,.2f}%
+Return to Player (RTP): {(money_won/money_bet)*100:,.2f}%""",
+    }
+    generate_analysis_pdf(analysis_data,'DICE_ANALYSIS.pdf',[])
     with open(f"DICE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
         file.write(f"""DICE {over_under.upper()} {threshold} ANALYSIS
 Server Seed: {server}
