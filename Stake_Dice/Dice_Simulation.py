@@ -103,7 +103,7 @@ def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
     keys = list(occurrence_dict.keys())
     values = [occurrence_dict[k] for k in keys]
     colors = ["red" if index%2==0 else "blue" for index in range(len(keys))]
-    bar_heights:list[float|int] = [(x+2)**1.12 for x in range(len(values))]
+    bar_heights:list[float|int] = values
     
     # Create figure and axis
     plt.figure(figsize=(12, 6))
@@ -112,8 +112,8 @@ def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
     bars:BarContainer = plt.bar(range(len(keys)), bar_heights, width=0.6, color=colors, edgecolor='black')
     
     # Customize the plot
-    plt.title('Occurrences of Milestone Multipliers', fontsize=16)
-    plt.xlabel('Multiplier', fontsize=14)
+    plt.title('Occurrences of Perfect Rolls', fontsize=16)
+    plt.xlabel('Value', fontsize=14)
     plt.ylabel('Occurrences', fontsize=14)
     plt.xticks(ticks=range(len(keys)), labels=[f"{key:,}" for key in keys], rotation=90)
     plt.yticks(ticks=[max(bar_heights)*0.2,max(bar_heights)*0.4,max(bar_heights)*0.6,max(bar_heights)*0.8,max(bar_heights)],labels=[f"{quantile(values,0.2):,.0f}",f"{quantile(values,0.4):,.0f}",f"{quantile(values,0.6):,.0f}",f"{quantile(values,0.8):,.0f}",f"{max(values):,.0f}"])
@@ -184,9 +184,9 @@ if __name__ == "__main__":
         configuration:dict[str,str|int] = json.load(file)
 
     if(True):
-        server:str = generate_server_seed()#configuration["ServerSeed"]
+        server:str = configuration["ServerSeed"]
         server_hashed:str = sha256_encrypt(server)
-        client:str = generate_client_seed()#configuration["ClientSeed"]
+        client:str = configuration["ClientSeed"]
         nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
         over_under:str = configuration["OverUnder"]
         threshold:float = round(configuration["Threshold"],2)
@@ -202,6 +202,7 @@ if __name__ == "__main__":
         current_winning_streak:int = 0
         current_losing_streak:int = 0
         losing_streak_sizes:list[int] = []
+        winning_streak_sizes:list[int] = []
 
         total_number_of_wins:int = 0
         total_number_of_losses:int = 0
@@ -216,7 +217,7 @@ if __name__ == "__main__":
 
         money_won:float = 0
         money_bet:float = 0
-        nonces_with_perfect_rolls:list[int] = []
+        perfect_rolls:dict[int,int] = {0:0,100:0}
 
     for nonce in nonces:
         total_games_played += 1
@@ -239,11 +240,13 @@ if __name__ == "__main__":
           ):
             if(current_winning_streak > biggest_winning_streak[1]):
                 biggest_winning_streak = (nonce-current_winning_streak,current_winning_streak)
+            if(current_winning_streak>0):
+                winning_streak_sizes.append(current_winning_streak)
             current_winning_streak = 0
             current_losing_streak += 1
             total_number_of_losses += 1
             money_spent_over_current_losing_streak += bet_size
-            current_result.extend([seed_result,"NO"])
+            current_result.extend([over_under.upper(),threshold,seed_result,"NO",bet_size,0,money_bet,money_won])
         else:
             if(current_losing_streak > biggest_losing_streak[1]):
                 biggest_losing_streak = (nonce-current_losing_streak,current_losing_streak)
@@ -259,22 +262,14 @@ if __name__ == "__main__":
             balance += bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")]
             if(balance > biggest_balance):
                 biggest_balance = balance
-            current_result.extend([seed_result,"YES"])
-        if(
-            (
-                (seed_result > 99.99)and
-                (over_under == "Over")
-            )
-            or
-            (
-                (seed_result < 0.01)and
-                (over_under == "Under")
-            )
-          ):
-            nonces_with_perfect_rolls.append(f"{nonce:,.0f}")
+            current_result.extend([over_under.upper(),threshold,seed_result,"YES",bet_size,bet_size*dice_multipliers[over_under][float(f"{threshold:.2f}")],round(money_bet,2),round(money_won,2)])
+        if((seed_result > 99.99) or (seed_result < 0.01)):
+            perfect_rolls[int(seed_result)] += 1
         results.append(current_result)
-    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Win"]).to_csv(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
-    
+    df:DataFrame = DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Over Under","Threshold","Result","Win","Bet Size","Gross Winnings (Round)","Total Money Wagered","Gross Total Winnings"])
+    df.to_csv(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=True)
+    df.to_json(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json",orient='table',indent=4)
+
     analysis_data:dict[str,int|float|str] = {
         "summary":f"""Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
@@ -297,8 +292,29 @@ Theoretical House Edge: 1.00%
 Theoretical Return to Player (RTP): 99.00%
 Actual House Edge: {(1-(money_won/money_bet))*100:,.2f}%
 Return to Player (RTP): {(money_won/money_bet)*100:,.2f}%""",
+
+        "winning_losing_streaks":f"""Biggest Winning Streak: {biggest_winning_streak[1]:,.0f}
+Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
+Mean Winning Streak: {mean(winning_streak_sizes):,.3f}
+Median Winning Streak: {median(winning_streak_sizes):,.1f}
+Statistical Summary of Winning Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(winning_streak_sizes) if len(winning_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streak_sizes,0.25) if len(winning_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{median(winning_streak_sizes) if len(winning_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streak_sizes,0.75) if len(winning_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streak_sizes,0.95) if len(winning_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streak_sizes,0.99) if len(winning_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{max(winning_streak_sizes) if len(winning_streak_sizes)>0 else 0:,.0f}
+{'-'*130}
+Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
+Starting Nonce of Biggest Losing Streak: {biggest_losing_streak[0]:,.0f}
+Mean Losing Streak: {mean(losing_streak_sizes):,.3f}
+Median Losing Streak: {median(losing_streak_sizes):,.1f}
+Statistical Summary of Losing Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(losing_streak_sizes) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.25) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{median(losing_streak_sizes) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.75) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.95) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.99) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{max(losing_streak_sizes) if len(losing_streak_sizes)>0 else 0:,.0f}""",
+
     }
-    generate_analysis_pdf(analysis_data,'DICE_ANALYSIS.pdf',[])
+    generate_analysis_pdf(analysis_data,'DICE_ANALYSIS.pdf',[
+                plot_occurrences()
+            ])
+
+
     with open(f"DICE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
         file.write(f"""DICE {over_under.upper()} {threshold} ANALYSIS
 Server Seed: {server}
