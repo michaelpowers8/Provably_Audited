@@ -224,7 +224,7 @@ This chart shows the frequency of various milestone multipliers commonly bet on 
 
     pdf.output(filename)
 
-if __name__ == "__main__":
+def main():
     with open("Configuration.json","rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
@@ -257,8 +257,6 @@ if __name__ == "__main__":
     cumulative_games:list[int] = []
 
     money_won:float = 0
-    round_winnings:float = 0
-    round_bettings:float = 0
 
     milestone_multiplier:dict[int,int] = {
             1_000_000:0,
@@ -365,3 +363,6 @@ Statistical Summary of Losing Streaks:
                         plot_accumulation(cumulative_games,cumulative_profit,'Net Profit','Red','Cumulative Net Profit Over Time','Net Profit')
                     ]
                 )
+
+if __name__ == "__main__":
+    main()

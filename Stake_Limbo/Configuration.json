@@ -3,6 +3,6 @@
 	"ClientSeed": "k2lOa3xGLY",
 	"MinimumNonce": 1,
 	"MaximumNonce": 100000,
-	"TargetMultiplier": 3,
-	"BetSize": 2.23
+	"TargetMultiplier": 6.92,
+	"BetSize": 4.95
 }
