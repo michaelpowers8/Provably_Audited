@@ -1,10 +1,11 @@
+import os
 import hmac
+import json
 import hashlib
 import random
 import string
 from io import BytesIO
 from math import floor
-import json
 from pandas import DataFrame
 from fpdf import FPDF,XPos,YPos
 import matplotlib.pyplot as plt
@@ -225,7 +226,12 @@ This chart shows the frequency of various milestone multipliers commonly bet on 
     pdf.output(filename)
 
 def main():
-    with open("Configuration.json","rb") as file:
+    # Get the path to the folder this script is in
+    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+
+    # Safely construct the full path to Configuration.json
+    config_path:str = os.path.join(BASE_DIR, "Configuration.json")
+    with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
     server:str = configuration["ServerSeed"]
@@ -315,8 +321,8 @@ def main():
         cumulative_profit.append(money_won-total_money_bet)
 
     df:DataFrame = DataFrame(results,columns=["Server Seed","Server Seed (Hashed)","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"])
-    df.to_csv(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
-    df.to_json(f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json",orient='table',indent=4)
+    df.to_csv(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv"),index=False)
+    df.to_json(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json"),orient='table',indent=4)
     del df
 
     analysis_data:dict[str,int|float|str] = {
@@ -358,7 +364,7 @@ Statistical Summary of Losing Streaks:
 \tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
 \t{min(losing_streaks) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.25) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{median(losing_streaks) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.75) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.95) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.99) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{max(losing_streaks) if len(losing_streaks)>0 else 0:,.0f}""",
         }
-    generate_analysis_pdf(analysis_data,"LIMBO_ANALYSIS.pdf",[
+    generate_analysis_pdf(analysis_data,os.path.join(BASE_DIR,"LIMBO_ANALYSIS.pdf"),[
                         plot_occurrences(milestone_multiplier),
                         plot_accumulation(cumulative_games,cumulative_profit,'Net Profit','Red','Cumulative Net Profit Over Time','Net Profit')
                     ]

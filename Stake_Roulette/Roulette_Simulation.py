@@ -1,3 +1,4 @@
+import os
 import hmac
 import hashlib
 import random
@@ -217,7 +218,7 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
 def thousands_formatter(x, pos):
     return f"{x:,.0f}"
 
-def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
+def plot_occurrences(occurrence_dict:dict[int,int],roulette_numbers_colors:dict[str,str]) -> BytesIO:
     """
     Creates a bar chart from a dictionary of occurrences.
     
@@ -317,8 +318,13 @@ def plot_dozen_accumulation(cumulative_games:list[int],cumulative_dozen_1:list[i
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
-if __name__ == "__main__":
-    with open("Configuration.json","rb") as file:
+def main():
+    # Get the path to the folder this script is in
+    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+
+    # Safely construct the full path to Configuration.json
+    config_path:str = os.path.join(BASE_DIR, "Configuration.json")
+    with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
     if(True):
@@ -646,7 +652,8 @@ if __name__ == "__main__":
         cumulative_balance.append(balance)
         current_result.extend([seed_result,balance,round_bettings,round_winnings,roulette_numbers_colors[str(seed_result)]])
         results.append(current_result)
-    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Balance","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_csv(f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=False)
+    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Balance","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_csv(os.path.join(BASE_DIR,f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv"),index=False)
+    DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Result","Balance","Total Wager (Round)","Gross Winnings (Round)","Color"]).to_json(os.path.join(BASE_DIR,f"ROULETTE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json"),orient='table',indent=4)
     analysis_data:dict[str,int|float|str] = {
         "summary":f"""Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
@@ -837,9 +844,9 @@ First 10 Nonces Resulting in 0: {"|".join(nonces_with_result_0[:10])}"""
         plt.close()  # Free memory
         img_buffer_balance.seek(0)  # Rewind buffer to start
 
-    generate_analysis_pdf(analysis_data,"ROULETTE_ANALYSIS.pdf",[
+    generate_analysis_pdf(analysis_data,os.path.join(BASE_DIR,"ROULETTE_ANALYSIS.pdf"),[
                 img_buffer_red_black,
-                plot_occurrences(single_number_occurrences),
+                plot_occurrences(single_number_occurrences,roulette_numbers_colors=roulette_numbers_colors),
                 img_buffer_balance,
                 img_buffer_1_to_18_19_to_36,
                 img_buffer_even_odd,
@@ -847,3 +854,6 @@ First 10 Nonces Resulting in 0: {"|".join(nonces_with_result_0[:10])}"""
                 img_buffer_vertical_columns
             ]
         )
+
+if __name__ == "__main__":
+    main()

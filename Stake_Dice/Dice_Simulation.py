@@ -1,3 +1,4 @@
+import os
 import hmac
 import hashlib
 import random
@@ -180,7 +181,12 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.output(filename)
 
 if __name__ == "__main__":
-    with open("Configuration.json","rb") as file:
+    # Get the path to the folder this script is in
+    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+
+    # Safely construct the full path to Configuration.json
+    config_path:str = os.path.join(BASE_DIR, "Configuration.json")
+    with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
     if(True):
@@ -208,7 +214,7 @@ if __name__ == "__main__":
         total_number_of_losses:int = 0
         total_games_played:int = 0
 
-        balance:float = 10000
+        balance:float = 10_000_000
         starting_balance:float = balance
         biggest_balance:float = balance
 
@@ -267,8 +273,8 @@ if __name__ == "__main__":
             perfect_rolls[int(seed_result)] += 1
         results.append(current_result)
     df:DataFrame = DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Over Under","Threshold","Result","Win","Bet Size","Gross Winnings (Round)","Total Money Wagered","Gross Total Winnings"])
-    df.to_csv(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv",index=True)
-    df.to_json(f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json",orient='table',indent=4)
+    df.to_csv(os.path.join(BASE_DIR,f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv"),index=True)
+    df.to_json(os.path.join(BASE_DIR,f"DICE_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json"),orient='table',indent=4)
 
     analysis_data:dict[str,int|float|str] = {
         "summary":f"""Server Seed: {server}
@@ -310,12 +316,12 @@ Statistical Summary of Losing Streaks:
 \t{min(losing_streak_sizes) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.25) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{median(losing_streak_sizes) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.75) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.95) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streak_sizes,0.99) if len(losing_streak_sizes)>0 else 0:,.0f}\t\t|\t\t{max(losing_streak_sizes) if len(losing_streak_sizes)>0 else 0:,.0f}""",
 
     }
-    generate_analysis_pdf(analysis_data,'DICE_ANALYSIS.pdf',[
-                plot_occurrences()
+    generate_analysis_pdf(analysis_data,os.path.join(BASE_DIR,'DICE_ANALYSIS.pdf'),[
+                plot_occurrences(perfect_rolls)
             ])
 
 
-    with open(f"DICE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
+    with open(os.path.join(BASE_DIR,f"DICE_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt"),"w") as file:
         file.write(f"""DICE {over_under.upper()} {threshold} ANALYSIS
 Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
@@ -343,6 +349,5 @@ Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
 Starting Nonce of Biggest Losing Streak: {biggest_losing_streak[0]:,.0f}
 With ${bet_size:,.2f} bets, gross winnings: ${money_won:,.2f}
 With ${bet_size:,.2f} bets, net result: ${abs(money_won-money_bet):,.2f} {"won" if money_won-money_bet>0 else "lost"}.
-Number of perfect {100 if over_under=="Over" else 0} rolls: {len(nonces_with_perfect_rolls):,.0f}
-
+Number of perfect {100 if over_under=="Over" else 0} rolls: {perfect_rolls[0 if over_under=="Under" else 100]:,.0f}
 """)

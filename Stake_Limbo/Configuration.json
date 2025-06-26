@@ -1,8 +1,8 @@
 {
-	"ServerSeed": "fa18081cb423696c8ad04b12efc0154ecc746857c2105f7d82d342d7df1c70d5",
-	"ClientSeed": "k2lOa3xGLY",
+	"ServerSeed": "d5775817e8bc6be085dbd6f353fd793df1dac0c4c0fe6ad377684e62ab6eee3a",
+	"ClientSeed": "djrAE_jp-0",
 	"MinimumNonce": 1,
-	"MaximumNonce": 100000,
-	"TargetMultiplier": 6.92,
-	"BetSize": 4.95
+	"MaximumNonce": 1000000,
+	"TargetMultiplier": 10000,
+	"BetSize": 1
 }

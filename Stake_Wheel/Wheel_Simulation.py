@@ -1,3 +1,4 @@
+import os
 import hmac
 import hashlib
 import random
@@ -66,7 +67,12 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int,risk:str,segments
                 return wheel_multipliers[f"{risk}{segments}"][prize_index]
 
 if __name__ == "__main__":
-    with open("Configuration.json","rb") as file:
+    # Get the path to the folder this script is in
+    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+
+    # Safely construct the full path to Configuration.json
+    config_path:str = os.path.join(BASE_DIR, "Configuration.json")
+    with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
     server:str = configuration["ServerSeed"]
