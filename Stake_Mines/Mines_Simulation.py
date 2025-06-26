@@ -1,3 +1,4 @@
+import os
 import hmac
 import hashlib
 import random
@@ -80,25 +81,25 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int,num_mines:str,pre
                 if(((row,col+1) in final_mines_coordinates) and (prediction_configuration[row-1][col]==1)):
                     payout_multiplier = 0
                     final_grid[4-col][row-1] = f" 💣 "
-                    final_clicks_grid[4-col][row-1] = f" 🔴 "
+                    final_clicks_grid[row-1][col] = f" 🔴 "
                     mines_locations.pop(0)
                 elif(((row,col+1) in final_mines_coordinates)):
                     mines_locations.pop(0)
                     final_grid[4-col][row-1] = " 💣 "
-                    final_clicks_grid[4-col][row-1] = " 🟡 "
+                    final_clicks_grid[row-1][col] = " 🟡 "
                 elif(prediction_configuration[row-1][col]==1):
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[4-col][row-1] = " 🟢 "
+                    final_clicks_grid[row-1][col] = " 🟢 "
                 else:
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[4-col][row-1] = " 🟡 "
+                    final_clicks_grid[row-1][col] = " 🟡 "
             else:
                 if(prediction_configuration[row-1][col]==1):
                     final_grid[4-col][row-1] = " 💎 "
                     final_clicks_grid[col][row-1] = " 🟢 "
                 else:
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[4-col][row-1] = " 🟡 "
+                    final_clicks_grid[row-1][col] = " 🟡 "
             count += 1
         row_reverse += 1
     return payout_multiplier,final_grid,final_clicks_grid
@@ -121,7 +122,12 @@ def seed_result_to_string(results:list[list[str]]) -> str:
     return final_string
 
 if __name__ == "__main__":
-    with open("Configuration.json","rb") as file:
+    # Get the path to the folder this script is in
+    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+
+    # Safely construct the full path to Configuration.json
+    config_path:str = os.path.join(BASE_DIR, "Configuration.json")
+    with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
 
     server:str = configuration["ServerSeed"]
@@ -164,11 +170,12 @@ if __name__ == "__main__":
             total_number_of_wins += 1
         current_result.extend([current_winnings,seed_result_to_string(seed_result),seed_result_to_string(clicks_results)])
         results.append(current_result.copy())
-    with open(f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w",encoding='utf-8') as file:
+    with open(os.path.join(BASE_DIR,f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt"),"w",encoding='utf-8') as file:
         file.write("[\n")
         for result in results:
             file.write("\t{\n")
-            file.write(f"""     Server Seed: {result[0]},
+            file.write(\
+f"""        Server Seed: {result[0]},
         Client Seed: {result[1]},
         Nonce: {result[2]},
         Amount Won: {result[3]},
@@ -180,12 +187,13 @@ if __name__ == "__main__":
         file.write("]")
             
     # DataFrame(results,columns=["Server Seed","Client Seed","Nonce","Amount Won","Mine Configuration","Clicks Results"]).to_excel(f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.xlsx",index=False)
-    with open(f"MINES_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt","w") as file:
+    with open(os.path.join(BASE_DIR,f"MINES_RESULTS_ANALYSIS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt"),"w",encoding='utf-8') as file:
         file.write(f"""MINES {num_mines} MINES ANALYSIS
 Server Seed: {server}
 Server Seed (Hashed): {server_hashed}
 Client Seed: {client}
 Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
+Bet Size: ${bet_size:,.2f}
 Number of mines placed: {num_mines:,.0f}
 Number of boxes clicked: {sum(1 for sublist in prediction_configuration for item in sublist if item == 1)}
 Winning Multiplier: {winning_multiplier:,.2f}
