@@ -12,6 +12,7 @@ from pandas import DataFrame
 from fpdf import FPDF,XPos,YPos
 from matplotlib.ticker import FuncFormatter
 from numpy import mean,median,quantile
+BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
 
 def generate_server_seed():
     possible_characters:str = string.hexdigits
@@ -220,9 +221,6 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     pdf.output(filename)
 
 def load_configuration() -> dict[str,str|int]:
-    # Get the path to the folder this script is in
-    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
-
     # Safely construct the full path to Configuration.json
     config_path:str = os.path.join(BASE_DIR, "Configuration.json")
     with open(config_path,"rb") as file:
@@ -336,55 +334,57 @@ class Limbo_Simulation_Tracker:
         self.money_won:float = 0
 
         self.milestone_multiplier:dict[int,int] = _initialize_milestone_multipliers(target_multiplier=self.target_multiplier)
-        self.milestone_multiplier = dict(sorted(self.milestone_multiplier.items(),reverse=True))        
+        self.milestone_multiplier = dict(sorted(self.milestone_multiplier.items(),reverse=True))   
+
+    def run_simulation(self):
+        for nonce in self.nonces:
+            self.total_games_played += 1
+            self.cumulative_games.append(self.total_games_played)
+            self.total_money_bet += self.bet_size
+            self.current_result = [self.server,self.server_hashed,self.client,nonce]
+            seed_result = seeds_to_results(server_seed=self.server,client_seed=self.client,nonce=nonce)
+            for key,item in self.milestone_multiplier.items():
+                if(seed_result>key):
+                    self.milestone_multiplier[key] += 1
+                    break
+            if(seed_result < self.target_multiplier):
+                if(self.current_winning_streak > self.biggest_winning_streak[1]):
+                    self.biggest_winning_streak = (nonce-self.current_winning_streak,self.current_winning_streak)
+                if(self.current_winning_streak>0):
+                    self.winning_streaks.append(self.current_winning_streak)
+                self.current_winning_streak = 0
+                self.current_losing_streak += 1
+                self.total_number_of_losses +=1
+                self.current_result.extend([self.target_multiplier,seed_result,"NO",self.bet_size,0,round(self.total_money_bet,2),round(self.money_won,2)])
+            else:
+                if(self.current_losing_streak > self.biggest_losing_streak[1]):
+                    self.biggest_losing_streak = (nonce-self.current_losing_streak,self.current_losing_streak)
+                if(self.current_losing_streak>0):
+                    self.losing_streaks.append(self.current_losing_streak)
+                self.current_losing_streak = 0
+                self.current_winning_streak += 1
+                self.total_number_of_wins += 1
+                self.money_won += (self.bet_size*self.target_multiplier)
+                self.current_result.extend([self.target_multiplier,round(seed_result,2),"YES",self.bet_size,round(self.bet_size*self.target_multiplier,2),round(self.total_money_bet,2),round(self.money_won,2)])
+            self.results.append(self.current_result)
+            self.cumulative_profit.append(self.money_won-self.total_money_bet) 
+        self._save_raw_data()
+
+    def _save_raw_data(self):
+        df:DataFrame = DataFrame(self.results,columns=["Server Seed","Server Seed (Hashed)","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"])
+        df.to_csv(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{self.server}_{self.client}_{self.nonces[0]}_to_{self.nonces[-1]}.csv"),index=False)
+        df.to_json(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{self.server}_{self.client}_{self.nonces[0]}_to_{self.nonces[-1]}.json"),orient='table',indent=4)    
 
 def main():
-    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
     tracker:Limbo_Simulation_Tracker = Limbo_Simulation_Tracker()
-
-    for nonce in nonces:
-        total_games_played += 1
-        cumulative_games.append(total_games_played)
-        total_money_bet += bet_size
-        current_result = [server,server_hashed,client,nonce]
-        seed_result = seeds_to_results(server_seed=server,client_seed=client,nonce=nonce)
-        for key,item in milestone_multiplier.items():
-            if(seed_result>key):
-                milestone_multiplier[key] += 1
-                break
-        if(seed_result < target_multiplier):
-            if(current_winning_streak > biggest_winning_streak[1]):
-                biggest_winning_streak = (nonce-current_winning_streak,current_winning_streak)
-            if(current_winning_streak>0):
-                winning_streaks.append(current_winning_streak)
-            current_winning_streak = 0
-            current_losing_streak += 1
-            total_number_of_losses +=1
-            current_result.extend([target_multiplier,seed_result,"NO",bet_size,0,round(total_money_bet,2),round(money_won,2)])
-        else:
-            if(current_losing_streak > biggest_losing_streak[1]):
-                biggest_losing_streak = (nonce-current_losing_streak,current_losing_streak)
-            if(current_losing_streak>0):
-                losing_streaks.append(current_losing_streak)
-            current_losing_streak = 0
-            current_winning_streak += 1
-            total_number_of_wins += 1
-            money_won += (bet_size*target_multiplier)
-            current_result.extend([target_multiplier,round(seed_result,2),"YES",bet_size,round(bet_size*target_multiplier,2),round(total_money_bet,2),round(money_won,2)])
-        results.append(current_result)
-        cumulative_profit.append(money_won-total_money_bet)
-
-    df:DataFrame = DataFrame(results,columns=["Server Seed","Server Seed (Hashed)","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"])
-    df.to_csv(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.csv"),index=False)
-    df.to_json(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json"),orient='table',indent=4)
-    del df
-
-    analysis_data:dict[str,int|float|str] = _get_analysis_data(local_variables=locals())
-    generate_analysis_pdf(analysis_data,os.path.join(BASE_DIR,"LIMBO_ANALYSIS.pdf"),[
-                        plot_occurrences(milestone_multiplier),
-                        plot_accumulation(cumulative_games,cumulative_profit,'Net Profit','Red','Cumulative Net Profit Over Time','Net Profit')
-                    ]
-                )
+    tracker.run_simulation()
+    analysis_data:dict[str,int|float|str] = _get_analysis_data(local_variables=tracker.__dict__)
+    generate_analysis_pdf(
+                analysis_data,os.path.join(BASE_DIR,"LIMBO_ANALYSIS.pdf"),[
+                plot_occurrences(tracker.milestone_multiplier),
+                plot_accumulation(tracker.cumulative_games,tracker.cumulative_profit,'Net Profit','Red','Cumulative Net Profit Over Time','Net Profit')
+            ]
+        )
 
 if __name__ == "__main__":
     main()
