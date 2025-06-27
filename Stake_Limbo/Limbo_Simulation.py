@@ -1,18 +1,142 @@
 import os
+import sys
 import hmac
 import json
 import random
 import string
+import shutil
 import hashlib
 import traceback
 import matplotlib.pyplot as plt
+import xml.etree.ElementTree as ET
+from typing import Any
 from io import BytesIO
 from math import floor
 from pandas import DataFrame
 from fpdf import FPDF,XPos,YPos
-from matplotlib.ticker import FuncFormatter
 from numpy import mean,median,quantile
+from datetime import datetime, timedelta
+from matplotlib.ticker import FuncFormatter
+
+LOG_FILE = "Limbo_Simulation_Log.xml"
+ARCHIVE_FOLDER = "archive"
+LOG_RETENTION_DAYS = 30  
 BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+
+def save_variable_info(locals_dict:dict[str,Any]) -> None:
+    # Get the current global and local variables
+    globals_dict:dict[str,Any] = globals()
+    
+    # Combine them, prioritizing locals (to avoid duplicates)
+    all_vars:dict[str,Any] = {**globals_dict, **locals_dict}
+    
+    # Filter out modules, functions, and built-ins
+    variable_info:list[dict[str,str|int|float|list|set|dict|bytes]] = []
+    for name, value in all_vars.items():
+        # Skip special variables, modules, and callables
+        if name.startswith('__') and name.endswith('__'):
+            continue
+        if callable(value):
+            continue
+        if isinstance(value, type(sys)):  # Skip modules
+            continue
+            
+        # Get variable details
+        var_type:str = type(value).__name__
+        try:
+            var_hash:str = hashlib.sha256(str(value).encode('utf-8')).hexdigest()
+        except Exception:
+            var_hash:str = "Unhashable"
+        
+        var_size:int = sys.getsizeof(value)
+        
+        variable_info.append({
+            "Variable Name": name,
+            "Type": var_type,
+            "Hash": var_hash,
+            "Size (bytes)": var_size
+        })
+    
+    # Convert to a DataFrame for nice tabular output
+    df:DataFrame = DataFrame(variable_info)
+    df.to_json(os.path.join(BASE_DIR,"Boilerplate_Prediction_End_Variables.json"),orient='table',indent=4)
+
+def get_current_log_filename(basepath:str) -> str:
+    """Generates a log filename based on the current date."""
+    return f"{basepath}/{LOG_FILE}_{datetime.now().strftime('%Y%m%d')}.xml"
+
+def rotate_logs():
+    """Checks if the log file date has changed and archives it if needed."""
+    current_date = datetime.now().strftime("%Y%m%d")
+    
+    # Get the last modified date of the existing log file
+    if os.path.exists(LOG_FILE):
+        modified_time = datetime.fromtimestamp(os.path.getmtime(LOG_FILE)).strftime("%Y%m%d")
+
+        if modified_time != current_date:  # If the log is from a previous day, archive it
+            # Ensure archive folder exists
+            if not os.path.exists(ARCHIVE_FOLDER):
+                os.makedirs(ARCHIVE_FOLDER)
+
+            # Move the old log file to archive with a date-based name
+            archive_filename = f"{ARCHIVE_FOLDER}/{LOG_FILE}_{modified_time}.xml"
+            shutil.move(LOG_FILE, archive_filename)
+
+            # Perform cleanup of old logs
+            delete_old_logs()
+
+def delete_old_logs():
+    """Deletes logs that are older than LOG_RETENTION_DAYS."""
+    cutoff_date:datetime = datetime.now() - timedelta(days=LOG_RETENTION_DAYS)
+
+    if not os.path.exists(ARCHIVE_FOLDER):
+        return  # No logs to delete
+
+    for filename in os.listdir(ARCHIVE_FOLDER):
+        if filename.startswith(f"{LOG_FILE}") and filename.endswith(".xml"):
+            try:
+                # Extract date from filename
+                date_str:str = filename.replace(f"{LOG_FILE}", "").replace(".xml", "")
+                log_date:datetime = datetime.strptime(date_str, "%Y%m%d")
+
+                # Delete files older than retention period
+                if log_date < cutoff_date:
+                    file_path:str = os.path.join(ARCHIVE_FOLDER, filename)
+                    os.remove(file_path)
+
+            except ValueError:
+                # Ignore files that don't match the expected date format
+                pass
+
+def log_to_xml(message:str, status="INFO", basepath=os.path.dirname(os.path.realpath(__file__))):
+    """
+    Logs a message to an XML file, ensuring daily log rotation and old log cleanup.
+    """
+    rotate_logs()  # Check if the date has changed and archive if necessary
+
+    # Get the correct filename for today's log
+    current_log_file = get_current_log_filename(basepath=basepath)
+
+    # Create file if it does not exist
+    if not os.path.exists(current_log_file):
+        root = ET.Element("logs")
+        tree = ET.ElementTree(root)
+        tree.write(current_log_file)
+
+    # Load existing XML file
+    tree = ET.parse(current_log_file)
+    root = tree.getroot()
+
+    # Create log entry
+    log_entry = ET.SubElement(root, "log")
+    log_entry.set("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    log_entry.set("status", status)
+
+    message_element = ET.SubElement(log_entry, "message")
+    message_element.text = message
+
+    # Write changes back to the file
+    tree.write(current_log_file)
 
 def generate_server_seed():
     possible_characters:str = string.hexdigits
@@ -212,11 +336,26 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     _add_pdf_winning_losing_streak_page(pdf=pdf, analysis_data=analysis_data)
     pdf.output(filename)
 
+def verify_configuration(configuration:dict[str,str|int]) -> bool:
+    required_keys:list[str] = ["ServerSeed","ClientSeed","MinimumNonce","MaximumNonce","TargetMultiplier","BetSize"]
+    missing_keys:list[str] = []
+
+    for key in required_keys:
+        if key not in configuration.keys():
+            missing_keys.append(key)
+
+    if len(missing_keys) > 0:
+        log_to_xml(message=f"Configuration missing {','.join(missing_keys)} keys. Terminating program.",status='CRITICAL')
+        return False
+    return True
+
 def load_configuration() -> dict[str,str|int]:
     # Safely construct the full path to Configuration.json
     config_path:str = os.path.join(BASE_DIR, "Configuration.json")
     with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
+    if verify_configuration(configuration=configuration):
+        return None
     return configuration
 
 def get_configuration_variables(configuration:dict[str,str|int]) -> tuple[str,str,str,list[int],str|int|float,str|float|int]:
@@ -295,12 +434,14 @@ Statistical Summary of Losing Streaks:
 \t{min(local_variables['losing_streaks']) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.25) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{median(local_variables['losing_streaks']) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.75) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.95) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.99) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{max(local_variables['losing_streaks']) if len(local_variables['losing_streaks'])>0 else 0:,.0f}""",
         }
         return analysis_data
-    except:
-        print(traceback.format_exc())
+    except Exception as e:
+        log_to_xml(message=f"Error getting analysis data. Official error: {traceback.format_exc()}",status="CRITICAL")
 
 class Limbo_Simulation_Tracker:
     def __init__(self):
         self.configuration:dict[str,str|int] = load_configuration()
+        if self.configuration is None:
+            return
         self.server,self.server_hashed,self.client,self.nonces,self.target_multiplier,self.bet_size = get_configuration_variables(configuration=self.configuration)
 
         self.results:list[list[float|int]] = []
@@ -329,46 +470,54 @@ class Limbo_Simulation_Tracker:
         self.milestone_multiplier = dict(sorted(self.milestone_multiplier.items(),reverse=True))   
 
     def run_simulation(self):
-        for nonce in self.nonces:
-            self.total_games_played += 1
-            self.cumulative_games.append(self.total_games_played)
-            self.total_money_bet += self.bet_size
-            self.current_result = [self.server,self.server_hashed,self.client,nonce]
-            seed_result = seeds_to_results(server_seed=self.server,client_seed=self.client,nonce=nonce)
-            for key,item in self.milestone_multiplier.items():
-                if(seed_result>key):
-                    self.milestone_multiplier[key] += 1
-                    break
-            if(seed_result < self.target_multiplier):
-                if(self.current_winning_streak > self.biggest_winning_streak[1]):
-                    self.biggest_winning_streak = (nonce-self.current_winning_streak,self.current_winning_streak)
-                if(self.current_winning_streak>0):
-                    self.winning_streaks.append(self.current_winning_streak)
-                self.current_winning_streak = 0
-                self.current_losing_streak += 1
-                self.total_number_of_losses +=1
-                self.current_result.extend([self.target_multiplier,seed_result,"NO",self.bet_size,0,round(self.total_money_bet,2),round(self.money_won,2)])
-            else:
-                if(self.current_losing_streak > self.biggest_losing_streak[1]):
-                    self.biggest_losing_streak = (nonce-self.current_losing_streak,self.current_losing_streak)
-                if(self.current_losing_streak>0):
-                    self.losing_streaks.append(self.current_losing_streak)
-                self.current_losing_streak = 0
-                self.current_winning_streak += 1
-                self.total_number_of_wins += 1
-                self.money_won += (self.bet_size*self.target_multiplier)
-                self.current_result.extend([self.target_multiplier,round(seed_result,2),"YES",self.bet_size,round(self.bet_size*self.target_multiplier,2),round(self.total_money_bet,2),round(self.money_won,2)])
-            self.results.append(self.current_result)
-            self.cumulative_profit.append(self.money_won-self.total_money_bet) 
-        self._save_raw_data()
+        try:
+            for nonce in self.nonces:
+                self.total_games_played += 1
+                self.cumulative_games.append(self.total_games_played)
+                self.total_money_bet += self.bet_size
+                self.current_result = [self.server,self.server_hashed,self.client,nonce]
+                seed_result = seeds_to_results(server_seed=self.server,client_seed=self.client,nonce=nonce)
+                for key,item in self.milestone_multiplier.items():
+                    if(seed_result>key):
+                        self.milestone_multiplier[key] += 1
+                        break
+                if(seed_result < self.target_multiplier):
+                    if(self.current_winning_streak > self.biggest_winning_streak[1]):
+                        self.biggest_winning_streak = (nonce-self.current_winning_streak,self.current_winning_streak)
+                    if(self.current_winning_streak>0):
+                        self.winning_streaks.append(self.current_winning_streak)
+                    self.current_winning_streak = 0
+                    self.current_losing_streak += 1
+                    self.total_number_of_losses +=1
+                    self.current_result.extend([self.target_multiplier,seed_result,"NO",self.bet_size,0,round(self.total_money_bet,2),round(self.money_won,2)])
+                else:
+                    if(self.current_losing_streak > self.biggest_losing_streak[1]):
+                        self.biggest_losing_streak = (nonce-self.current_losing_streak,self.current_losing_streak)
+                    if(self.current_losing_streak>0):
+                        self.losing_streaks.append(self.current_losing_streak)
+                    self.current_losing_streak = 0
+                    self.current_winning_streak += 1
+                    self.total_number_of_wins += 1
+                    self.money_won += (self.bet_size*self.target_multiplier)
+                    self.current_result.extend([self.target_multiplier,round(seed_result,2),"YES",self.bet_size,round(self.bet_size*self.target_multiplier,2),round(self.total_money_bet,2),round(self.money_won,2)])
+                self.results.append(self.current_result)
+                self.cumulative_profit.append(self.money_won-self.total_money_bet) 
+            self._save_raw_data()
+        except Exception as e:
+            log_to_xml(message=f"Error running simulation. Official error thrown: {traceback.format_exc()}")
 
     def _save_raw_data(self):
-        df:DataFrame = DataFrame(self.results,columns=["Server Seed","Server Seed (Hashed)","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"])
-        df.to_csv(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{self.server}_{self.client}_{self.nonces[0]}_to_{self.nonces[-1]}.csv"),index=False)
-        df.to_json(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{self.server}_{self.client}_{self.nonces[0]}_to_{self.nonces[-1]}.json"),orient='table',indent=4)    
+        try:
+            df:DataFrame = DataFrame(self.results,columns=["Server Seed","Server Seed (Hashed)","Client Seed","Nonce","Target","Result","Win","Bet Size","Money Won (Round)","Total Money Wagered","Total Gross Winnings"])
+            df.to_csv(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{self.server}_{self.client}_{self.nonces[0]}_to_{self.nonces[-1]}.csv"),index=False)
+            df.to_json(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{self.server}_{self.client}_{self.nonces[0]}_to_{self.nonces[-1]}.json"),orient='table',indent=4)    
+        except Exception as e:
+            log_to_xml(f"Error saving raw data. Official error thrown: {traceback.format_exc()}")
 
 def main():
     tracker:Limbo_Simulation_Tracker = Limbo_Simulation_Tracker()
+    if tracker.configuration  is None:
+        return
     tracker.run_simulation()
     analysis_data:dict[str,int|float|str] = _get_analysis_data(local_variables=tracker.__dict__)
     generate_analysis_pdf(
