@@ -42,14 +42,6 @@ def seeds_to_hexadecimals(server_seed:str,client_seed:str,nonce:int) -> list[str
 def hexadecimal_to_bytes(hexadecimal:str) -> list[int]:
     return list(bytes.fromhex(hexadecimal))
 
-def bytes_to_basic_number(bytes_list: list[int]) -> int:
-    # Calculate a weighted index based on the first four bytes
-    number:float = ((float(bytes_list[0]) / float(256**1)) +
-              (float(bytes_list[1]) / float(256**2)) +
-              (float(bytes_list[2]) / float(256**3)) +
-              (float(bytes_list[3]) / float(256**4)))
-    return number
-
 def bytes_to_number(bytes_list: list[int],multiplier:int) -> int:
     # Calculate a weighted index based on the first four bytes
     number:float =  (
