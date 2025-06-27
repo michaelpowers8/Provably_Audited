@@ -1,15 +1,15 @@
 import os
 import hmac
 import json
-import hashlib
 import random
 import string
+import hashlib
+import traceback
+import matplotlib.pyplot as plt
 from io import BytesIO
 from math import floor
 from pandas import DataFrame
 from fpdf import FPDF,XPos,YPos
-import matplotlib.pyplot as plt
-from matplotlib.container import BarContainer
 from matplotlib.ticker import FuncFormatter
 from numpy import mean,median,quantile
 
@@ -76,56 +76,48 @@ def thousands_formatter(x, pos):
 def thousands_formatter_with_dollar_signs(x, pos):
     return f"${x:,.0f}"
 
-def plot_occurrences(occurrence_dict:dict[int,int]) -> BytesIO:
+def _save_plot_to_buffer() -> BytesIO:
     """
-    Creates a bar chart from a dictionary of occurrences.
+    Saves the current matplotlib plot to a BytesIO buffer and resets the figure.
     
-    Parameters:
-    occurrence_dict (dict): Dictionary with keys 0-36 and integer values
+    Returns:
+        BytesIO: Buffer containing the plot as a PNG image.
     """
-    
-    # Prepare data
-    keys = list(occurrence_dict.keys())
-    values = [occurrence_dict[k] for k in keys]
-    colors = ["red" if index%2==0 else "blue" for index in range(len(keys))]
-    bar_heights:list[float|int] = [(x+2)**1.12 for x in range(len(values))]
-    
-    # Create figure and axis
-    plt.figure(figsize=(12, 6))
-    
-    # Create bar chart
-    bars:BarContainer = plt.bar(range(len(keys)), bar_heights, width=0.6, color=colors, edgecolor='black')
-    
-    # Customize the plot
-    plt.title('Occurrences of Milestone Multipliers', fontsize=16)
-    plt.xlabel('Multiplier', fontsize=14)
-    plt.ylabel('Occurrences', fontsize=14)
-    plt.xticks(ticks=range(len(keys)), labels=[f"{key:,}" for key in keys], rotation=90)
-    plt.yticks(ticks=[max(bar_heights)*0.2,max(bar_heights)*0.4,max(bar_heights)*0.6,max(bar_heights)*0.8,max(bar_heights)],labels=[f"{quantile(values,0.2):,.0f}",f"{quantile(values,0.4):,.0f}",f"{quantile(values,0.6):,.0f}",f"{quantile(values,0.8):,.0f}",f"{max(values):,.0f}"])
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
-    
-    # Add value labels - vertical, centered, bold, and formatted
-    for bar in bars:
-        height = bar.get_height()
-        if height > 0:
-            plt.text(bar.get_x() + bar.get_width()/2.,  # x-position: center of bar
-                    height/2,  # y-position: middle of bar height
-                    f'{values[bars.index(bar)]:,.0f}',  # Formatted number with thousand separators
-                    ha='center', va='center',  # centered both horizontally and vertically
-                    fontsize=12,
-                    fontweight='bold',  # bold text
-                    rotation='vertical',  # vertical text
-                    color='white')  # text color
-    
-    # Adjust layout to prevent label cutoff
-    # plt.tight_layout()
-    
-    # Save the plot to a bytes buffer (instead of a file)
     img_buffer:BytesIO = BytesIO()
     plt.savefig(img_buffer, format='png', dpi=300, bbox_inches="tight")
     plt.close()  # Free memory
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
+
+def plot_occurrences(occurrence_dict: dict) -> BytesIO:
+    """
+    Plots the frequency of milestone multipliers and returns the image as a buffer.
+    
+    Args:
+        occurrence_dict: Dictionary of {multiplier: frequency}.
+    
+    Returns:
+        BytesIO: PNG image buffer.
+    """
+    keys = list(occurrence_dict.keys())
+    values = [occurrence_dict[k] for k in keys]
+    colors = ["red" if i % 2 == 0 else "blue" for i in range(len(keys))]
+    
+    # Plot bars
+    plt.figure(figsize=(12, 6))
+    bars = plt.bar(range(len(keys)), [(x+2)**1.12 for x in range(len(values))],
+                   width=0.6, color=colors, edgecolor='black')
+    
+    # Add labels and styling
+    plt.title('Occurrences of Milestone Multipliers', fontsize=16)
+    plt.xticks(ticks=range(len(keys)), labels=[f"{key:,}" for key in keys], rotation=90)
+    for bar in bars:
+        height = bar.get_height()
+        plt.text(bar.get_x() + bar.get_width()/2, height/2, 
+                f'{values[bars.index(bar)]:,.0f}', ha='center', va='center',
+                fontsize=12, fontweight='bold', rotation='vertical', color='white')
+    
+    return _save_plot_to_buffer()
 
 def plot_accumulation(cumulative_games:list[int],cumulative_item_1:list[int],label_1:str,color_1:str,title:str,ylabel:str):
     plt.figure(figsize=(10, 6))
@@ -149,10 +141,7 @@ def plot_accumulation(cumulative_games:list[int],cumulative_item_1:list[int],lab
     img_buffer.seek(0)  # Rewind buffer to start
     return img_buffer
 
-def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers:list[BytesIO]):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
-
+def _add_pdf_summary_page(pdf:FPDF, analysis_data:dict):
     # --- Page 1: Summary ---
     pdf.add_page()
     pdf.set_font("Helvetica", size=24, style='B')
@@ -162,6 +151,7 @@ def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers
     for text in analysis_data["summary"].split('\n'):
         pdf.cell(0, 10, text=text, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
+def _add_milestone_multiplier_frequency(pdf:FPDF, img_buffers:list[BytesIO]):
     # --- Page 2: Milestone Multiplier Frequency ---
     pdf.add_page()  # Force new page
     pdf.set_font("Helvetica", size=24, style='B')
@@ -178,6 +168,36 @@ This chart shows the frequency of various milestone multipliers commonly bet on 
             align='L'
         )
 
+def _statistical_summary_in_winning_losing_streak_page(pdf:FPDF, analysis_data:dict[str,int|float|str], line:str):
+    # This is a table header
+    pdf.set_font("Helvetica", size=12, style='B')
+    pdf.cell(0, 10, text=line.replace("Statistical Summary of", "").strip(":").strip(), 
+            border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
+    pdf.set_font("Courier", size=10)  # Use monospace for tables
+    
+    # Get the next line which contains the column headers
+    headers = analysis_data["winning_losing_streaks"].split('\n')[analysis_data["winning_losing_streaks"].split('\n').index(line)+1].split('|')
+    # Get the line after that which contains the data
+    data_line = next(iter(analysis_data["winning_losing_streaks"].split('\n')[i+2] for i, l in enumerate(analysis_data["winning_losing_streaks"].split('\n')) if l == line))
+    data = data_line.split('|')
+    
+    # Draw table
+    col_width = 25  # Adjust as needed
+    pdf.set_fill_color(200, 220, 255)
+    
+    # Header row
+    for header in headers:
+        pdf.cell(col_width, 8, header.strip(), border=1, align='C', fill=True)
+    pdf.ln()
+    
+    # Data row
+    for item in data:
+        pdf.cell(col_width, 8, item.strip(), border=1, align='C')
+    pdf.ln()
+    
+    pdf.set_font("Helvetica", size=14)  # Reset font
+
+def _add_pdf_winning_losing_streak_page(pdf:FPDF, analysis_data:dict[str,int|float|str]):
     # --- Page 3: Winning/Losing Streaks ---
     pdf.add_page()
     pdf.set_font("Helvetica", size=24, style='B')
@@ -185,47 +205,21 @@ This chart shows the frequency of various milestone multipliers commonly bet on 
     pdf.set_font("Helvetica", size=14)
     for line in analysis_data["winning_losing_streaks"].split('\n'):
         if "Statistical Summary of" in line:
-            # This is a table header
-            pdf.set_font("Helvetica", size=12, style='B')
-            pdf.cell(0, 10, text=line.replace("Statistical Summary of", "").strip(":").strip(), 
-                    border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-            pdf.set_font("Courier", size=10)  # Use monospace for tables
-            
-            # Get the next line which contains the column headers
-            headers = analysis_data["winning_losing_streaks"].split('\n')[analysis_data["winning_losing_streaks"].split('\n').index(line)+1].split('|')
-            # Get the line after that which contains the data
-            data_line = next(iter(analysis_data["winning_losing_streaks"].split('\n')[i+2] for i, l in enumerate(analysis_data["winning_losing_streaks"].split('\n')) if l == line))
-            data = data_line.split('|')
-            
-            # Draw table
-            col_width = 25  # Adjust as needed
-            pdf.set_fill_color(200, 220, 255)
-            
-            # Header row
-            for header in headers:
-                pdf.cell(col_width, 8, header.strip(), border=1, align='C', fill=True)
-            pdf.ln()
-            
-            # Data row
-            for item in data:
-                pdf.cell(col_width, 8, item.strip(), border=1, align='C')
-            pdf.ln()
-            
-            pdf.set_font("Helvetica", size=14)  # Reset font
+            _statistical_summary_in_winning_losing_streak_page(pdf=pdf, analysis_data=analysis_data, line=line)
         elif("|" in line):
             pass
         else:
             pdf.cell(0, 10, text=line, border=0, new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
-    # --- Page 2: Milestone Multiplier Frequency ---
-    pdf.add_page()  # Force new page
-    pdf.set_font("Helvetica", size=24, style='B')
-    pdf.cell(200, 10, text="CUMULATIVE NET PROFIT OVER TIME", new_x=XPos.LMARGIN, new_y=YPos.NEXT, align='C')
-    pdf.image(img_buffers[1], x=8, y=30, w=190)  # No filename needed!
-
+def generate_analysis_pdf(analysis_data:dict[str,str], filename:str, img_buffers:list[BytesIO]):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)  # Auto-page-break with margin
+    _add_pdf_summary_page(pdf=pdf, analysis_data=analysis_data)
+    _add_milestone_multiplier_frequency(pdf=pdf, img_buffers=img_buffers)
+    _add_pdf_winning_losing_streak_page(pdf=pdf, analysis_data=analysis_data)
     pdf.output(filename)
 
-def main():
+def load_configuration() -> dict[str,str|int]:
     # Get the path to the folder this script is in
     BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
 
@@ -233,37 +227,18 @@ def main():
     config_path:str = os.path.join(BASE_DIR, "Configuration.json")
     with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
+    return configuration
 
+def get_configuration_variables(configuration:dict[str,str|int]) -> tuple[str,str,str,list[int],str|int|float,str|float|int]:
     server:str = configuration["ServerSeed"]
     server_hashed:str = sha256_encrypt(server)
     client:str = configuration["ClientSeed"]
     nonces:list[int] = list(range(configuration["MinimumNonce"],configuration["MaximumNonce"]+1))
-    target_multiplier = configuration["TargetMultiplier"]
-    win_chance = ((1/target_multiplier)*0.99)*100
-    bet_size = configuration["BetSize"]
+    target_multiplier:str|int|float = configuration["TargetMultiplier"]
+    bet_size:str|int|float = configuration["BetSize"]
+    return server,server_hashed,client,nonces,target_multiplier,bet_size
 
-    results:list[list[float|int]] = []
-    current_result:list[int] = []
-    cumulative_profit:list[float] = []
-
-    biggest_winning_streak:tuple[int,int] = (0,0)
-    biggest_losing_streak:tuple[int,int] = (0,0)
-
-    current_winning_streak:int = 0
-    current_losing_streak:int = 0
-
-    winning_streaks:list[int] = []
-    losing_streaks:list[int] = []
-
-    total_number_of_wins:int = 0
-    total_number_of_losses:int = 0
-
-    total_games_played:int = 0
-    total_money_bet:float = 0
-    cumulative_games:list[int] = []
-
-    money_won:float = 0
-
+def _initialize_milestone_multipliers(target_multiplier:int) -> dict[int,int]:
     milestone_multiplier:dict[int,int] = {
             1_000_000:0,
             500_000:0,
@@ -286,7 +261,86 @@ def main():
             1.01:0
         }
     milestone_multiplier[target_multiplier] = 0
-    milestone_multiplier = dict(sorted(milestone_multiplier.items(),reverse=True))
+    return milestone_multiplier
+
+def _get_analysis_data(local_variables:dict):
+    try:
+        analysis_data:dict[str,int|float|str] = {
+            "summary":f"""Server Seed: {local_variables["server"]}
+Server Seed (Hashed): {local_variables['server_hashed']}
+Client Seed: {local_variables['client']}
+Nonces: {local_variables['nonces'][0]:,.0f} - {local_variables['nonces'][-1]:,.0f}
+Target Multiplier: {local_variables['target_multiplier']:,.2f}x
+{'-'*130}
+Total Games Played: {local_variables['total_games_played']:,.0f}
+Theoretical Number of Wins: {(local_variables['total_games_played']/local_variables['target_multiplier'])*0.99:,.2f}
+Actual Number of Wins: {local_variables['total_number_of_wins']:,.0f}
+{'-'*130}
+Theoretical Number of Losses: {local_variables['total_games_played'] - ((local_variables['total_games_played']/local_variables['target_multiplier'])*0.99):,.2f}
+Actual Number of Losses: {local_variables['total_number_of_losses']:,.0f}
+{'-'*130}
+Total Money Wagered: ${local_variables['total_money_bet']:,.2f}
+Gross Winnings: ${local_variables['money_won']:,.2f}
+Net Winnings: ${abs(local_variables['total_money_bet']-local_variables['money_won']):,.2f} {"won" if local_variables['money_won']-local_variables['total_money_bet']>0 else "lost"}
+{'-'*130}
+Theoretical House Edge: 1.00%
+Theoretical Return to Player (RTP): 99.00%
+Actual House Edge: {(1-(local_variables['money_won']/local_variables['total_money_bet']))*100:,.2f}%
+Return to Player (RTP): {(local_variables['money_won']/local_variables['total_money_bet'])*100:,.2f}%""",
+
+        "winning_losing_streaks":f"""Biggest Winning Streak: {local_variables['biggest_winning_streak'][1]:,.0f}
+Starting Nonce of Biggest Winning Streak: {local_variables['biggest_winning_streak'][0]:,.0f}
+Mean Winning Streak: {mean(local_variables['winning_streaks']):,.3f}
+Median Winning Streak: {median(local_variables['winning_streaks']):,.1f}
+Statistical Summary of Winning Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(local_variables['winning_streaks']) if len(local_variables['winning_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['winning_streaks'],0.25) if len(local_variables['winning_streaks'])>0 else 0:,.0f}\t\t|\t\t{median(local_variables['winning_streaks']) if len(local_variables['winning_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['winning_streaks'],0.75) if len(local_variables['winning_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['winning_streaks'],0.95) if len(local_variables['winning_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['winning_streaks'],0.99) if len(local_variables['winning_streaks'])>0 else 0:,.0f}\t\t|\t\t{max(local_variables['winning_streaks']) if len(local_variables['winning_streaks'])>0 else 0:,.0f}
+{'-'*120}
+Biggest Losing Streak: {local_variables['biggest_losing_streak'][1]:,.0f}
+Starting Nonce of Biggest Losing Streak: {local_variables['biggest_losing_streak'][0]:,.0f}
+Mean Losing Streak: {mean(local_variables['losing_streaks']):,.3f}
+Median Losing Streak: {median(local_variables['losing_streaks']):,.1f}
+Statistical Summary of Losing Streaks:
+\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
+\t{min(local_variables['losing_streaks']) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.25) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{median(local_variables['losing_streaks']) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.75) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.95) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{quantile(local_variables['losing_streaks'],0.99) if len(local_variables['losing_streaks'])>0 else 0:,.0f}\t\t|\t\t{max(local_variables['losing_streaks']) if len(local_variables['losing_streaks'])>0 else 0:,.0f}""",
+        }
+        return analysis_data
+    except:
+        print(traceback.format_exc())
+
+class Limbo_Simulation_Tracker:
+    def __init__(self):
+        self.configuration:dict[str,str|int] = load_configuration()
+        self.server,self.server_hashed,self.client,self.nonces,self.target_multiplier,self.bet_size = get_configuration_variables(configuration=self.configuration)
+
+        self.results:list[list[float|int]] = []
+        self.current_result:list[int] = []
+        self.cumulative_profit:list[float] = []
+
+        self.biggest_winning_streak:tuple[int,int] = (0,0)
+        self.biggest_losing_streak:tuple[int,int] = (0,0)
+
+        self.current_winning_streak:int = 0
+        self.current_losing_streak:int = 0
+
+        self.winning_streaks:list[int] = []
+        self.losing_streaks:list[int] = []
+
+        self.total_number_of_wins:int = 0
+        self.total_number_of_losses:int = 0
+
+        self.total_games_played:int = 0
+        self.total_money_bet:float = 0
+        self.cumulative_games:list[int] = []
+
+        self.money_won:float = 0
+
+        self.milestone_multiplier:dict[int,int] = _initialize_milestone_multipliers(target_multiplier=self.target_multiplier)
+        self.milestone_multiplier = dict(sorted(self.milestone_multiplier.items(),reverse=True))        
+
+def main():
+    BASE_DIR:str = os.path.dirname(os.path.abspath(__file__))
+    tracker:Limbo_Simulation_Tracker = Limbo_Simulation_Tracker()
 
     for nonce in nonces:
         total_games_played += 1
@@ -325,45 +379,7 @@ def main():
     df.to_json(os.path.join(BASE_DIR,f"LIMBO_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.json"),orient='table',indent=4)
     del df
 
-    analysis_data:dict[str,int|float|str] = {
-        "summary":f"""Server Seed: {server}
-Server Seed (Hashed): {server_hashed}
-Client Seed: {client}
-Nonces: {nonces[0]:,.0f} - {nonces[-1]:,.0f}
-Target Multiplier: {target_multiplier:,.2f}x
-{'-'*130}
-Total Games Played: {total_games_played:,.0f}
-Theoretical Number of Wins: {(total_games_played/target_multiplier)*0.99:,.2f}
-Actual Number of Wins: {total_number_of_wins:,.0f}
-{'-'*130}
-Theoretical Number of Losses: {total_games_played - ((total_games_played/target_multiplier)*0.99):,.2f}
-Actual Number of Losses: {total_number_of_losses:,.0f}
-{'-'*130}
-Total Money Wagered: ${total_money_bet:,.2f}
-Gross Winnings: ${money_won:,.2f}
-Net Winnings: ${abs(total_money_bet-money_won):,.2f} {"won" if money_won-total_money_bet>0 else "lost"}
-{'-'*130}
-Theoretical House Edge: 1.00%
-Theoretical Return to Player (RTP): 99.00%
-Actual House Edge: {(1-(money_won/total_money_bet))*100:,.2f}%
-Return to Player (RTP): {(money_won/total_money_bet)*100:,.2f}%""",
-
-        "winning_losing_streaks":f"""Biggest Winning Streak: {biggest_winning_streak[1]:,.0f}
-Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
-Mean Winning Streak: {mean(winning_streaks):,.3f}
-Median Winning Streak: {median(winning_streaks):,.1f}
-Statistical Summary of Winning Streaks:
-\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
-\t{min(winning_streaks) if len(winning_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streaks,0.25) if len(winning_streaks)>0 else 0:,.0f}\t\t|\t\t{median(winning_streaks) if len(winning_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streaks,0.75) if len(winning_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streaks,0.95) if len(winning_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(winning_streaks,0.99) if len(winning_streaks)>0 else 0:,.0f}\t\t|\t\t{max(winning_streaks) if len(winning_streaks)>0 else 0:,.0f}
-{'-'*120}
-Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
-Starting Nonce of Biggest Losing Streak: {biggest_losing_streak[0]:,.0f}
-Mean Losing Streak: {mean(losing_streaks):,.3f}
-Median Losing Streak: {median(losing_streaks):,.1f}
-Statistical Summary of Losing Streaks:
-\tMin\t\t|\t\t25%\t\t|\t\t50%\t\t|\t\t75%\t\t|\t\t95%\t\t|\t\t99%\t\t|\t\tMax
-\t{min(losing_streaks) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.25) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{median(losing_streaks) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.75) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.95) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{quantile(losing_streaks,0.99) if len(losing_streaks)>0 else 0:,.0f}\t\t|\t\t{max(losing_streaks) if len(losing_streaks)>0 else 0:,.0f}""",
-        }
+    analysis_data:dict[str,int|float|str] = _get_analysis_data(local_variables=locals())
     generate_analysis_pdf(analysis_data,os.path.join(BASE_DIR,"LIMBO_ANALYSIS.pdf"),[
                         plot_occurrences(milestone_multiplier),
                         plot_accumulation(cumulative_games,cumulative_profit,'Net Profit','Red','Cumulative Net Profit Over Time','Net Profit')
