@@ -354,7 +354,7 @@ def load_configuration() -> dict[str,str|int]:
     config_path:str = os.path.join(BASE_DIR, "Configuration.json")
     with open(config_path,"rb") as file:
         configuration:dict[str,str|int] = json.load(file)
-    if verify_configuration(configuration=configuration):
+    if not(verify_configuration(configuration=configuration)):
         return None
     return configuration
 

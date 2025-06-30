@@ -1,8 +1,8 @@
 {
-	"ServerSeed": "fa18081cb423696caad04b12efc0154ecc746857c2105f7d82d042d7df1c70d5",
-	"ClientSeed": "k2lOa3xGLY",
+	"ServerSeed": "851878498d2476fddda42da846b286b652db0a7f23a38ecc2bcbd4bca17f64dc",
+	"ClientSeed": "OzJdG7Ih-v",
 	"MinimumNonce": 1,
-	"MaximumNonce": 1000,
+	"MaximumNonce": 1000000,
 	"FlipPredictions": ["Heads","Tails","Tails","Heads","Heads","Heads"],
-	"BetSize": 1000
+	"BetSize": 1
 }

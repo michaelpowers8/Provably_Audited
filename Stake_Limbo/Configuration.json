@@ -2,7 +2,7 @@
 	"ServerSeed": "d5775817e8bc6be085dbd6f353fd793df1dac0c4c0fe6ad377684e62ab6eee3a",
 	"ClientSeed": "djrAE_jp-0",
 	"MinimumNonce": 1,
-	"MaximumNonce": 10000,
-	"TargetMultiplier": 100,
+	"MaximumNonce": 100000,
+	"TargetMultiplier": 2,
 	"BetSize": 1
 }
