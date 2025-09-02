@@ -2,6 +2,7 @@ import os
 import hmac
 import hashlib
 import random
+import secrets
 import string
 from math import floor
 from pandas import DataFrame
@@ -78,39 +79,39 @@ def seeds_to_results(server_seed:str,client_seed:str,nonce:int,num_mines:str,pre
     for row in range(5,0,-1):
         for col in range(5):
             if(len(mines_locations)>0):
-                if(((row,col+1) in final_mines_coordinates) and (prediction_configuration[row-1][col]==1)):
+                if(((row,col+1) in final_mines_coordinates) and (prediction_configuration[4-col][row-1]==1)):
                     payout_multiplier = 0
                     final_grid[4-col][row-1] = f" 💣 "
-                    final_clicks_grid[row-1][col] = f" 🔴 "
+                    final_clicks_grid[4-col][row-1] = f" 🔴 "
                     mines_locations.pop(0)
                 elif(((row,col+1) in final_mines_coordinates)):
-                    mines_locations.pop(0)
                     final_grid[4-col][row-1] = " 💣 "
-                    final_clicks_grid[row-1][col] = " 🟡 "
-                elif(prediction_configuration[row-1][col]==1):
+                    final_clicks_grid[4-col][row-1] = " 🟡 "
+                    mines_locations.pop(0)
+                elif(prediction_configuration[4-col][row-1]==1):
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[row-1][col] = " 🟢 "
+                    final_clicks_grid[4-col][row-1] = " 🟢 "
                 else:
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[row-1][col] = " 🟡 "
+                    final_clicks_grid[4-col][row-1] = " 🟡 "
             else:
-                if(prediction_configuration[row-1][col]==1):
+                if(prediction_configuration[4-col][row-1]==1):
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[col][row-1] = " 🟢 "
+                    final_clicks_grid[4-col][row-1] = " 🟢 "
                 else:
                     final_grid[4-col][row-1] = " 💎 "
-                    final_clicks_grid[row-1][col] = " 🟡 "
+                    final_clicks_grid[4-col][row-1] = " 🟡 "
             count += 1
         row_reverse += 1
     return payout_multiplier,final_grid,final_clicks_grid
 
 def generate_server_seed():
-    possible_characters:str = string.hexdigits
+    possible_characters:str = string.ascii_lowercase+string.digits
     seed:str = "".join([random.choice(possible_characters) for _ in range(64)])
     return seed
 
 def generate_client_seed():
-    possible_characters:str = string.hexdigits
+    possible_characters:str = string.printable
     seed:str = "".join([random.choice(possible_characters) for _ in range(20)])
     return seed
 
@@ -149,10 +150,12 @@ if __name__ == "__main__":
     total_number_of_wins:int = 0
     total_number_of_losses:int = 0
     total_games_played:int = 0
+    money_bet:float = 0
     money_won:float = 0
 
     for nonce in nonces:
         total_games_played += 1
+        money_bet += bet_size
         current_result = [server,client,nonce]
         current_winnings,seed_result,clicks_results = seeds_to_results(server_seed=server,client_seed=client,nonce=nonce,num_mines=num_mines,prediction_configuration=prediction_configuration,bet_size=bet_size)
         money_won += current_winnings
@@ -161,13 +164,15 @@ if __name__ == "__main__":
                 biggest_winning_streak = (nonce-current_winning_streak,current_winning_streak)
             current_winning_streak = 0
             current_losing_streak += 1
-            total_number_of_losses +=1
+            total_number_of_losses += 1
+            bet_size *= 1.5
         else:
             if(current_losing_streak > biggest_losing_streak[1]):
                 biggest_losing_streak = (nonce-current_losing_streak,current_losing_streak)
             current_losing_streak = 0
             current_winning_streak += 1
             total_number_of_wins += 1
+            bet_size = configuration["BetSize"]
         current_result.extend([current_winnings,seed_result_to_string(seed_result),seed_result_to_string(clicks_results)])
         results.append(current_result.copy())
     with open(os.path.join(BASE_DIR,f"MINES_RESULTS_{server}_{client}_{nonces[0]}_to_{nonces[-1]}.txt"),"w",encoding='utf-8') as file:
@@ -176,6 +181,7 @@ if __name__ == "__main__":
             file.write("\t{\n")
             file.write(\
 f"""        Server Seed: {result[0]},
+        Server Seed (Hashed): {server_hashed}
         Client Seed: {result[1]},
         Nonce: {result[2]},
         Amount Won: {result[3]},
@@ -207,4 +213,4 @@ Starting Nonce of Biggest Winning Streak: {biggest_winning_streak[0]:,.0f}
 Biggest Losing Streak: {biggest_losing_streak[1]:,.0f}
 Starting Nonce of Biggest Losing Streak: {biggest_losing_streak[0]:,.0f}
 With ${bet_size:,.2f} bets, gross winnings: ${money_won:,.2f}
-With ${bet_size:,.2f} bets, net result: ${abs(money_won-(bet_size*total_games_played)):,.2f} {"won" if money_won-(bet_size*total_games_played)>0 else "lost"}.""")
+With ${bet_size:,.2f} bets, net result: ${abs(money_won-(money_bet)):,.2f} {"won" if money_won-(money_bet)>0 else "lost"}.""")
