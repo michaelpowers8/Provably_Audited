@@ -167,3 +167,8 @@ cython_debug/
 *.xml
 *.pdf
 *_RESULTS*.json
+*.tsv
+catboost*/
+bet*archive*.json
+Config*.json
+config*.json
